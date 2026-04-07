@@ -4,6 +4,7 @@
 import json
 import shutil
 from datetime import datetime, timezone
+from email.utils import parsedate_tz
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -88,6 +89,18 @@ def remove_em_dashes(text):
     return text.strip()
 
 
+def parse_date_ts(date_str):
+    """Parse an RSS date string into a Unix timestamp (0 if unparseable)."""
+    try:
+        tt = parsedate_tz(date_str)
+        if tt:
+            from calendar import timegm
+            return timegm(tt)
+    except Exception:
+        pass
+    return 0
+
+
 def get_all_posts(cache):
     """Flatten all posts from all sites, sorted chronologically."""
     all_posts = []
@@ -104,7 +117,7 @@ def get_all_posts(cache):
             )
 
     # Sort by published date (newest first)
-    all_posts.sort(key=lambda p: p.get("published", ""), reverse=True)
+    all_posts.sort(key=lambda p: parse_date_ts(p.get("published", "")), reverse=True)
     return all_posts
 
 
