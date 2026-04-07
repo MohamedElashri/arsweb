@@ -452,6 +452,26 @@ a:hover {
   margin-block-end: 0.2rem;
 }
 
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.825rem;
+  font-weight: 500;
+}
+
+.github-link:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.github-icon {
+  width: 16px;
+  height: 16px;
+  color: currentColor;
+}
+
 /* ===== Responsive: Tablet ===== */
 @media (max-width: 768px) {
   :root {
