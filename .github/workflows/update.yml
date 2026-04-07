@@ -5,7 +5,7 @@ on:
     - cron: "0 6 * * *"  # Daily at 6:00 UTC
   push:
     paths:
-      - "sources.json"
+      - "sources.txt"
     branches:
       - main
   workflow_dispatch:  # Manual trigger

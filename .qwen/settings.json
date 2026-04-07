@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(uv *)",
-      "Bash(source *)"
-    ]
-  },
-  "$version": 3
-}

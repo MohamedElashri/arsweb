@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 .PHONY: help venv fetch build clean preview deploy
 
 VENV = .venv

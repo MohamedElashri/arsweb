@@ -4,3 +4,4 @@ feed_cache.json
 __pycache__/
 *.pyc
 scripts/__pycache__/
+sources.json

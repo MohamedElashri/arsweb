@@ -18,7 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).parent.parent
-SOURCES_FILE = ROOT / "sources.json"
+SOURCES_FILE = ROOT / "sources.txt"
 CACHE_FILE = ROOT / "feed_cache.json"
 MAX_POSTS_PER_SITE = 5
 MAX_POSTS_TOTAL = 500
@@ -32,23 +32,28 @@ def has_arabic(text):
 
 
 def load_sources():
-    """Load the list of sites from sources.json."""
+    """Load feed URLs from sources.txt (one URL per line)."""
     with open(SOURCES_FILE, encoding="utf-8") as f:
-        return json.load(f)["sites"]
+        urls = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+    return urls
 
 
-def fetch_feed(site):
+def fetch_feed(feed_url):
     """Fetch a single RSS feed and return parsed entries."""
-    logger.info("Fetching %s ...", site["feed"])
+    logger.info("Fetching %s ...", feed_url)
     try:
-        feed = feedparser.parse(site["feed"])
+        feed = feedparser.parse(feed_url)
     except Exception as e:
-        logger.error("Failed to fetch %s: %s", site["feed"], e)
+        logger.error("Failed to fetch %s: %s", feed_url, e)
         return None
 
     if feed.bozo and not feed.entries:
-        logger.warning("No entries from %s (bozo: %s)", site["feed"], feed.bozo_exception)
+        logger.warning("No entries from %s (bozo: %s)", feed_url, feed.bozo_exception)
         return None
+
+    # Extract site name and URL from feed metadata
+    site_name = feed.feed.get("title", "").strip() or feed_url
+    site_url = feed.feed.get("link", "").strip() or feed_url
 
     entries = []
     for entry in feed.entries[:MAX_POSTS_PER_SITE]:
@@ -69,11 +74,8 @@ def fetch_feed(site):
             summary = html.unescape(summary)
             summary = summary[:500].strip()
 
-        # Skip posts without summary
         if not summary:
             continue
-
-        # Skip posts with no Arabic in title (allow mixed, but require some Arabic)
         if title and not has_arabic(title):
             continue
 
@@ -87,9 +89,9 @@ def fetch_feed(site):
         )
 
     return {
-        "name": site["name"],
-        "url": site["url"],
-        "feed": site["feed"],
+        "name": site_name,
+        "url": site_url,
+        "feed": feed_url,
         "entries": entries,
         "error": None,
     }
@@ -105,16 +107,16 @@ def main():
     }
 
     total_posts = 0
-    for site in sites:
-        result = fetch_feed(site)
+    for feed_url in sites:
+        result = fetch_feed(feed_url)
         if result is None:
-            logger.warning("Skipping %s due to errors", site.get("feed", "unknown"))
+            logger.warning("Skipping %s due to errors", feed_url)
             continue
 
         cache["sites"].append(result)
         post_count = len(result["entries"])
         total_posts += post_count
-        logger.info("Got %d entries from %s", post_count, site["name"])
+        logger.info("Got %d entries from %s", post_count, result["name"])
 
         if total_posts >= MAX_POSTS_TOTAL:
             break
