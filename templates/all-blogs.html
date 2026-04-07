@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="all-blogs">
+  <h1>{{ t.all_blogs }}</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t.site_name }}</th>
+        <th>{{ t.site_url }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for site in cache.sites %}
+      <tr>
+        <td><a href="{{ site.url }}" target="_blank" rel="noopener">{{ site.name }}</a></td>
+        <td><a href="{{ site.url }}" target="_blank" rel="noopener" class="url-link">{{ site.url }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

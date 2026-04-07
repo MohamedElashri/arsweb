@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+  <h1>{{ t.site_title }}</h1>
+  <p>{{ t.site_subtitle }}</p>
+  <div class="stats">
+    <span>{{ cache.sites_count }} {{ t.blogs_count }}</span>
+    <span>·</span>
+    <span>{{ cache.posts_count }} {{ t.posts_count }}</span>
+  </div>
+</section>
+
+<section class="posts">
+  {% if not all_posts %}
+  <p class="empty">{{ t.no_posts }}</p>
+  {% else %}
+  {% for post in all_posts %}
+  <article class="post">
+    <div class="post-meta">
+      <a href="{{ post.site_url }}" target="_blank" rel="noopener" class="post-site">{{ post.site_name }}</a>
+      {% if post.published %}
+      <time class="post-date">{% if lang == "ar" %}{{ post.date_ar }}{% else %}{{ post.published[:10] }}{% endif %}</time>
+      {% endif %}
+    </div>
+    <h2 class="post-title">
+      {% if post.link %}
+      <a href="{{ post.link }}" target="_blank" rel="noopener">{{ post.title }}</a>
+      {% else %}
+      {{ post.title }}
+      {% endif %}
+    </h2>
+    {% if post.summary %}
+    <p class="post-summary">{{ post.summary }}</p>
+    {% endif %}
+  </article>
+  {% endfor %}
+  {% endif %}
+</section>
+
+<section class="all-blogs-link">
+  <a href="all-blogs{{ suffix }}.html" target="_blank" rel="noopener">{{ t.all_blogs }} →</a>
+</section>
+{% endblock %}
