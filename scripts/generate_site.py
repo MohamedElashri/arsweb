@@ -23,14 +23,12 @@ ARABIC_MONTHS = {
 
 ROOT = Path(__file__).parent.parent
 CACHE_FILE = ROOT / "feed_cache.json"
-TRANSLATIONS_FILE = ROOT / "translations.json"
 TEMPLATES_DIR = ROOT / "templates"
 OUTPUT_DIR = ROOT / "public"
 STATIC_DIR = ROOT / "static"
 
 
 def load_cache():
-    """Load the feed cache."""
     if not CACHE_FILE.exists():
         print("No cache file found. Run fetch_feeds.py first.")
         return None
@@ -38,21 +36,13 @@ def load_cache():
         return json.load(f)
 
 
-def load_translations():
-    """Load translations."""
-    with open(TRANSLATIONS_FILE, encoding="utf-8") as f:
-        return json.load(f)
-
-
 def to_arabic_date(date_str):
-    """Convert an English date string to Arabic: DD شهر or DD شهر YYYY if not current year."""
     if not date_str:
         return ""
     for en, ar in ARABIC_MONTHS.items():
         date_str = date_str.replace(en, ar)
     result = date_str.translate(ARABIC_DIGITS)
     parts = result.split()
-
     day = month = year = None
     for part in parts:
         if part.endswith(",") and len(part) <= 5:
@@ -67,10 +57,8 @@ def to_arabic_date(date_str):
             year = part
         elif part.isdigit() and ":" not in part and day is None:
             day = part
-
     if not day or not month:
         return ""
-
     current_year = str(datetime.now().year).translate(ARABIC_DIGITS)
     if year and year != current_year:
         return f"{day} {month} {year}"
@@ -78,7 +66,6 @@ def to_arabic_date(date_str):
 
 
 def remove_em_dashes(text):
-    """Remove em dashes from text, replacing with suitable alternatives."""
     if not text:
         return ""
     text = text.replace("—", " - ").replace("–", " - ")
@@ -90,7 +77,6 @@ def remove_em_dashes(text):
 
 
 def parse_date_ts(date_str):
-    """Parse an RSS date string into a Unix timestamp (0 if unparseable)."""
     try:
         tt = parsedate_tz(date_str)
         if tt:
@@ -102,7 +88,6 @@ def parse_date_ts(date_str):
 
 
 def get_all_posts(cache):
-    """Flatten all posts from all sites, sorted chronologically."""
     all_posts = []
     for site in cache["sites"]:
         for entry in site["entries"]:
@@ -115,85 +100,35 @@ def get_all_posts(cache):
                     "title": remove_em_dashes(entry.get("title", "")),
                 }
             )
-
-    # Sort by published date (newest first)
     all_posts.sort(key=lambda p: parse_date_ts(p.get("published", "")), reverse=True)
+    for post in all_posts:
+        post["date_ar"] = to_arabic_date(post.get("published", ""))
     return all_posts
 
 
-def render_site(cache, translations):
-    """Render the full static site."""
+def render_site(cache):
     env = Environment(
         loader=FileSystemLoader(TEMPLATES_DIR),
         autoescape=True,
     )
 
-    env.globals["now"] = lambda: datetime.now(timezone.utc).isoformat()
-    env.filters["emdash"] = remove_em_dashes
-
     all_posts = get_all_posts(cache)
 
-    # Add Arabic-formatted dates to posts
-    for post in all_posts:
-        post["date_ar"] = to_arabic_date(post.get("published", ""))
+    pages = {
+        "index.html": "index.html",
+        "about.html": "about.html",
+        "all-blogs.html": "all-blogs.html",
+    }
 
-    # Render index.html (AR default) and index-en.html
-    for lang in ("ar", "en"):
-        t = translations[lang]
+    for template_name, out_name in pages.items():
         context = {
-            "lang": lang,
-            "dir": "rtl" if lang == "ar" else "ltr",
-            "t": t,
             "cache": cache,
             "all_posts": all_posts,
-            "is_index": True,
         }
-        template = env.get_template("index.html")
+        template = env.get_template(template_name)
         html = template.render(**context)
+        (OUTPUT_DIR / out_name).write_text(html, encoding="utf-8")
 
-        if lang == "en":
-            out_file = OUTPUT_DIR / "index-en.html"
-        else:
-            out_file = OUTPUT_DIR / "index.html"
-        out_file.write_text(html, encoding="utf-8")
-
-    # Render about page (AR default and EN)
-    for lang in ("ar", "en"):
-        t = translations[lang]
-        context = {
-            "lang": lang,
-            "dir": "rtl" if lang == "ar" else "ltr",
-            "t": t,
-            "cache": cache,
-        }
-        template = env.get_template("about.html")
-        html = template.render(**context)
-
-        if lang == "en":
-            out_file = OUTPUT_DIR / "about-en.html"
-        else:
-            out_file = OUTPUT_DIR / "about.html"
-        out_file.write_text(html, encoding="utf-8")
-
-    # Render all-blogs page (AR default and EN)
-    for lang in ("ar", "en"):
-        t = translations[lang]
-        context = {
-            "lang": lang,
-            "dir": "rtl" if lang == "ar" else "ltr",
-            "t": t,
-            "cache": cache,
-        }
-        template = env.get_template("all-blogs.html")
-        html = template.render(**context)
-
-        if lang == "en":
-            out_file = OUTPUT_DIR / "all-blogs-en.html"
-        else:
-            out_file = OUTPUT_DIR / "all-blogs.html"
-        out_file.write_text(html, encoding="utf-8")
-
-    # Copy static files
     if STATIC_DIR.exists():
         for item in STATIC_DIR.iterdir():
             if item.is_file():
@@ -205,10 +140,8 @@ def main():
     if cache is None:
         return
 
-    translations = load_translations()
-
     OUTPUT_DIR.mkdir(exist_ok=True)
-    render_site(cache, translations)
+    render_site(cache)
 
     print(f"Site generated in {OUTPUT_DIR}/")
     print(f"  {cache['sites_count']} sites, {cache['posts_count']} posts")

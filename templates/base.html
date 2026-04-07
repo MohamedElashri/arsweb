@@ -1,32 +1,29 @@
 <!DOCTYPE html>
-<html lang="{{ lang }}" dir="{{ dir }}">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ t.site_title }}</title>
-  <meta name="description" content="{{ t.site_subtitle }}">
+  <title>الشبكة العربية الصغيرة</title>
+  <meta name="description" content="مجموعة منتقاة من المدونات والمواقع الشخصية باللغة العربية">
   <meta name="author" content="Mohamed Elashri">
-  <link rel="canonical" href="https://melashri.net/asw/{% if lang == 'en' %}index-en.html{% else %}index.html{% endif %}">
+  <link rel="canonical" href="https://melashri.net/asw/">
 
-  {# SEO / Open Graph #}
-  <meta property="og:title" content="{{ t.site_title }}">
-  <meta property="og:description" content="{{ t.site_subtitle }}">
+  <meta property="og:title" content="الشبكة العربية الصغيرة">
+  <meta property="og:description" content="مجموعة منتقاة من المدونات والمواقع الشخصية باللغة العربية">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://melashri.net/asw/{% if lang == 'en' %}index-en.html{% else %}index.html{% endif %}">
+  <meta property="og:url" content="https://melashri.net/asw/">
   <meta property="og:image" content="https://melashri.net/asw/favicon.svg">
-  <meta property="og:locale" content="{% if lang == 'ar' %}ar_AR{% else %}en_US{% endif %}">
+  <meta property="og:locale" content="ar_AR">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="{{ t.site_title }}">
-  <meta name="twitter:description" content="{{ t.site_subtitle }}">
+  <meta name="twitter:title" content="الشبكة العربية الصغيرة">
+  <meta name="twitter:description" content="مجموعة منتقاة من المدونات والمواقع الشخصية باللغة العربية">
 
-  {# Favicon #}
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
 
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700&display=swap" rel="stylesheet">
 
   <script>
     (function() {
@@ -38,23 +35,16 @@
   </script>
 </head>
 <body>
-  {% set suffix = "-en" if lang == "en" else "" %}
   <header class="site-header">
     <nav class="nav">
-      <a href="index{{ suffix }}.html" class="nav-logo">
+      <a href="index.html" class="nav-logo">
         <img src="favicon.svg" alt="" class="logo-icon">
-        {{ t.site_title }}
+        الشبكة العربية الصغيرة
       </a>
       <div class="nav-links">
-        <a href="index{{ suffix }}.html">{{ t.latest_posts }}</a>
-        <a href="all-blogs{{ suffix }}.html">{{ t.all_blogs }}</a>
-        <a href="about{{ suffix }}.html">{{ t.about }}</a>
-        {% if lang == "ar" %}
-        <a href="index-en.html" class="lang-toggle">English</a>
-        {% else %}
-        <a href="index.html" class="lang-toggle">العربية</a>
-        {% endif %}
-        <button class="theme-toggle" aria-label="Toggle theme">
+        <a href="all-blogs.html">كل المدونات</a>
+        <a href="about.html">عن المشروع</a>
+        <button class="theme-toggle" aria-label="تبديل المظهر">
           <img src="icon-sun.svg" alt="" class="theme-icon theme-sun">
           <img src="icon-moon.svg" alt="" class="theme-icon theme-moon">
         </button>
@@ -67,14 +57,10 @@
   </main>
 
   <footer class="site-footer">
-    <p>{{ t.footer_text }}</p>
-    <p>{{ t.last_updated }}: {{ cache.generated_at[:10] }}</p>
-    <p>
-      <a href="https://github.com/MohamedElashri/asw" target="_blank" rel="noopener" class="github-link">
-        <img src="icon-github.svg" alt="" class="github-icon">
-        MohamedElashri/asw
-      </a>
-    </p>
+    <p>الشبكة العربية الصغيرة: أصوات عربية مستقلة على الويب</p>
+    <a href="https://github.com/MohamedElashri/asw" target="_blank" rel="noopener" class="github-link">
+      <img src="icon-github.svg" alt="" class="github-icon">
+    </a>
   </footer>
 
   <script>

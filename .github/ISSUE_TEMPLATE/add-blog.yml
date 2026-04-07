@@ -1,0 +1,55 @@
+name: "إضافة مدونة"
+description: "قدم مدونة عربية شخصية لإضافتها إلى الشبكة العربية الصغيرة."
+title: "إضافة مدونة: "
+labels: ["add-blog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## الشروط
+        تأكد من أن المدونة تستوفي جميع الشروط التالية:
+
+        - **مدونة شخصية** — يكتبها شخص واحد عن أفكاره أو تجاربه أو معرفته، وليست موقعًا لشركة أو مؤسسة أو علامة تجارية.
+        - **غير تجارية** — لا تحتوي على إعلانات أو محتوى مدفوع أو ترويجي.
+        - **خلاصة RSS/Atom** — يجب أن يتوفر رابط خلاصة يعمل.
+        - **محتوى عربي** — أغلبية المنشورات مكتوبة بالعربية.
+        - **نطاق مدفوع** — المدونة تستخدم دومين خاص (مثل `.com` أو `.net`). الاستضافة المجانية (WordPress.com، Blogger، إلخ) مقبولة فقط في حالات خاصة مع توضيح السبب.
+        - **نشطة** — على الأقل ٥ منشورات، وآخر منشور لا يتعدى عمره سنتين.
+        - **تنسيق مدونة** — الموقع يجب أن يكون مدونة بالأساس، وليس معرض أعمال أو متجر أو صفحة هبوط.
+
+  - type: input
+    id: name
+    attributes:
+      label: اسم المدونة
+      placeholder: "مثال: مدونة أحمد"
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: رابط المدونة
+      placeholder: "https://example.com"
+    validations:
+      required: true
+
+  - type: input
+    id: feed
+    attributes:
+      label: رابط الخلاصة RSS/Atom
+      placeholder: "https://example.com/feed.xml"
+    validations:
+      required: true
+
+  - type: input
+    id: author
+    attributes:
+      label: اسم الكاتب (اختياري)
+      placeholder: "مثال: أحمد محمد"
+
+  - type: textarea
+    id: justification
+    attributes:
+      label: ملاحظات إضافية (اختياري)
+      description: |
+        إذا كانت المدونة تستخدم استضافة مجانية، اشرح سبب قبولها. يمكنك أيضًا ذكر أي شيء مميز عن المدونة.

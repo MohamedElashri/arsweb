@@ -2,25 +2,25 @@
 
 {% block content %}
 <section class="hero">
-  <h1>{{ t.site_title }}</h1>
-  <p>{{ t.site_subtitle }}</p>
+  <h1>الشبكة العربية الصغيرة</h1>
+  <p>مجموعة منتقاة من المدونات والمواقع الشخصية باللغة العربية</p>
   <div class="stats">
-    <span>{{ cache.sites_count }} {{ t.blogs_count }}</span>
+    <span>{{ cache.sites_count }} مدونات</span>
     <span>·</span>
-    <span>{{ cache.posts_count }} {{ t.posts_count }}</span>
+    <span>{{ cache.posts_count }} منشورات</span>
   </div>
 </section>
 
 <section class="posts">
   {% if not all_posts %}
-  <p class="empty">{{ t.no_posts }}</p>
+  <p class="empty">لم يتم العثور على منشورات. حاول جلب الخلاصات أولاً.</p>
   {% else %}
   {% for post in all_posts %}
   <article class="post">
     <div class="post-meta">
       <a href="{{ post.site_url }}" target="_blank" rel="noopener" class="post-site">{{ post.site_name }}</a>
       {% if post.published %}
-      <time class="post-date">{% if lang == "ar" %}{{ post.date_ar }}{% else %}{{ post.published[:10] }}{% endif %}</time>
+      <time class="post-date">{{ post.date_ar }}</time>
       {% endif %}
     </div>
     <h2 class="post-title">
@@ -36,9 +36,5 @@
   </article>
   {% endfor %}
   {% endif %}
-</section>
-
-<section class="all-blogs-link">
-  <a href="all-blogs{{ suffix }}.html" target="_blank" rel="noopener">{{ t.all_blogs }} →</a>
 </section>
 {% endblock %}

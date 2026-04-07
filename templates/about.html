@@ -2,9 +2,8 @@
 
 {% block content %}
 <article class="about">
-  <h1>{{ t.about }}</h1>
+  <h1>عن المشروع</h1>
 
-  {% if lang == "ar" %}
   <p>
     <strong>الشبكة العربية الصغيرة</strong> هي مجموعة منتقاة من المدونات والمواقع الشخصية
     باللغة العربية. مستوحاة من مشروع
@@ -19,46 +18,29 @@
     فقط HTML بسيط.
   </p>
 
-  <h2>أضف موقعك</h2>
+  <h2>أضف مدونتك</h2>
   <p>
-    إذا كان لديك مدونة أو موقع شخصي بالعربية وتريد أن تُضاف، يرجى
-    <a href="https://github.com/MohamedElashri/asw/issues" target="_blank" rel="noopener">فتح issue</a> مع اسم موقعك
-    والرابط ورابط خلاصة RSS.
+    إذا كانت مدونتك الشخصية تستوفي الشروط أدناه، يمكنك
+    <a href="https://github.com/MohamedElashri/asw/issues/new?template=add-blog.yml" target="_blank" rel="noopener">فتح طلب إضافة</a> مع رابط الخلاصة واسم المدونة.
   </p>
+
+  <h3>شروط القبول</h3>
+  <ul>
+    <li><strong>مدونة شخصية</strong> يكتبها شخص واحد عن أفكاره أو تجاربه أو معرفته، وليست موقعًا لشركة أو مؤسسة أو علامة تجارية.</li>
+    <li><strong>غير تجارية</strong> لا تحتوي على إعلانات أو محتوى مدفوع أو ترويجي.</li>
+    <li><strong>خلاصة RSS/Atom</strong> يجب أن يتوفر رابط خلاصة يعمل.</li>
+    <li><strong>محتوى عربي</strong> أغلبية المنشورات مكتوبة بالعربية.</li>
+    <li><strong>نطاق مدفوع</strong> المدونة تستخدم دومين خاص (مثل <code>.com</code> أو <code>.net</code>). الاستضافة المجانية (WordPress.com، Blogger، إلخ) مقبولة فقط في حالات خاصة مع توضيح السبب.</li>
+    <li><strong>نشطة</strong> على الأقل ٥ منشورات، وآخر منشور لا يتعدى عمره سنتين.</li>
+    <li><strong>تنسيق مدونة</strong> الموقع يجب أن يكون مدونة بالأساس، وليس معرض أعمال أو متجر أو صفحة هبوط.</li>
+  </ul>
 
   <h2>لماذا؟</h2>
   <p>
     الويب العربي تهيمن عليه المنصات الكبيرة غالبًا. هذا المشروع يحتفي بالأصوات الفردية،
     أشخاص يكتبون عن حياتهم وأفكارهم وتجاربهم في مساحاتهم الخاصة.
   </p>
-  {% else %}
-  <p>
-    <strong>Arabic Small Web</strong> is a curated collection of Arabic-language personal blogs
-    and websites. Inspired by the <a href="https://kagi.com/smallweb" target="_blank" rel="noopener">Kagi Small Web</a>
-    project, it aims to make it easier to discover independent Arabic voices on the web.
-  </p>
 
-  <h2>How it works</h2>
-  <p>
-    We collect RSS feeds from a curated list of personal blogs and websites. A GitHub Action
-    runs daily to fetch new posts and regenerate this static site. No backend, no database,
-    just simple HTML.
-  </p>
-
-  <h2>Add your site</h2>
-  <p>
-    If you have a personal blog or website in Arabic and would like to be included, please
-    <a href="https://github.com/MohamedElashri/asw/issues" target="_blank" rel="noopener">open an issue</a> with your site
-    name, URL, and RSS feed link.
-  </p>
-
-  <h2>Why?</h2>
-  <p>
-    The Arabic web is often dominated by large platforms. This project celebrates individual
-    voices: people writing about their lives, ideas, and experiences in their own spaces.
-  </p>
-  {% endif %}
-
-  <a href="index{{ suffix }}.html" class="back-link">← {{ t.back_to_home }}</a>
+  <a href="index.html" class="back-link">← العودة للرئيسية</a>
 </article>
 {% endblock %}
