@@ -42,24 +42,10 @@ make deploy    # تنظيف → خطوط → جلب → بناء → فتح
 make clean     # حذف الملفات المُنشأة
 ```
 
-## هيكل المشروع
-
-```bash
-├── scripts/              # سكربتات Python
-│   ├── fetch_feeds.py    # جلب الخلاصات
-│   ├── generate_site.py  # إنشاء الموقع
-│   ├── test_discovery.py # اختبار خوارزمية الاكتشاف
-│   ├── validate_feeds.py # فحص جودة الخلاصات
-│   └── download_fonts.py # تحميل الخطوط محلياً
-├── templates/            # قوالب Jinja2
-├── static/               # CSS وأيقونات وخطوط
-│   └── fonts/           # خطوط محلية
-├── public/               # الموقع المُنشأ (يُنشر)
-```
 
 ## أضف مدونتك
 
-افتح [طلب إضافة](https://github.com/MohamedElashri/asw/issues/new?template=add-blog.yml) مع رابط الخلاصة واسم المدونة.
+افتح [طلب إضافة](https://github.com/MohamedElashri/arsweb/issues/new?template=add-blog.yml) مع رابط الخلاصة واسم المدونة.
 
 ## الرخصة
 
