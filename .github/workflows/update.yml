@@ -87,6 +87,12 @@ jobs:
       - name: Generate site
         run: make build
 
+      - name: Quick feed validation
+        run: |
+          source .venv/bin/activate
+          uv pip install requests
+          python scripts/validate_feeds.py --max-feeds 3 --no-age-check
+
       - name: Show feed statistics
         run: |
           source .venv/bin/activate

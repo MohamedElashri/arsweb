@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help venv fonts fetch build clean preview deploy
+.PHONY: help venv fonts fetch build clean preview deploy validate
 
 VENV = .venv
 ACTIVATE = source $(VENV)/bin/activate
@@ -11,6 +11,7 @@ help:
 	@echo "  make fonts     Download fonts locally"
 	@echo "  make fetch     Fetch RSS feeds from sources.txt"
 	@echo "  make build     Generate static site"
+	@echo "  make validate  Validate RSS feeds for quality and recency"
 	@echo "  make clean     Remove generated output"
 	@echo "  make preview   Open generated site in browser"
 	@echo "  make deploy    Run full pipeline and open result"
@@ -33,6 +34,10 @@ fetch:
 
 build:
 	$(ACTIVATE) && python scripts/generate_site.py
+
+validate:
+	$(ACTIVATE) && uv pip install requests
+	$(ACTIVATE) && python scripts/validate_feeds.py --max-feeds 5
 
 clean:
 	rm -rf public/ feed_cache.json

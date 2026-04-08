@@ -1,0 +1,202 @@
+name: Validate RSS Feeds
+
+on:
+  pull_request:
+    paths:
+      - "sources.txt"
+    branches:
+      - main
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  validate-feeds:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history to compare changes
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install deps
+        run: |
+          uv venv .venv
+          source .venv/bin/activate
+          uv pip install feedparser requests
+
+      - name: Get changed feeds
+        id: changed-feeds
+        run: |
+          # Get the base branch (main)
+          git fetch origin main:main
+          
+          # Find added or modified lines in sources.txt
+          if git diff --name-only main...HEAD | grep -q "sources.txt"; then
+            echo "sources.txt was modified"
+            
+            # Get added/modified feed URLs
+            CHANGED_FEEDS=$(git diff main...HEAD sources.txt | grep "^+https" | sed 's/^+//' | tr '\n' ',' | sed 's/,$//')
+            
+            if [ -n "$CHANGED_FEEDS" ]; then
+              echo "changed_feeds=$CHANGED_FEEDS" >> $GITHUB_OUTPUT
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              echo "Changed feeds: $CHANGED_FEEDS"
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "No feed URLs were added or modified"
+            fi
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "sources.txt was not modified"
+          fi
+
+      - name: Validate changed feeds
+        if: steps.changed-feeds.outputs.has_changes == 'true'
+        run: |
+          source .venv/bin/activate
+          python -c "
+          import feedparser
+          import requests
+          import sys
+          from datetime import datetime, timezone
+          from email.utils import parsedate_tz
+          import time
+          
+          def validate_feed(url):
+              print(f'🔍 Validating: {url}')
+              
+              try:
+                  # Check if URL is accessible
+                  response = requests.get(url, timeout=30, headers={'User-Agent': 'Mozilla/5.0'})
+                  response.raise_for_status()
+                  print(f'  ✅ HTTP Status: {response.status_code}')
+              except Exception as e:
+                  print(f'  ❌ HTTP Error: {e}')
+                  return False
+              
+              try:
+                  # Parse RSS feed
+                  feed = feedparser.parse(url)
+                  
+                  if feed.bozo:
+                      print(f'  ⚠️  Feed has parsing issues: {feed.bozo_exception}')
+                  
+                  if not feed.entries:
+                      print(f'  ❌ No entries found in feed')
+                      return False
+                  
+                  print(f'  ✅ Found {len(feed.entries)} entries')
+                  
+                  # Check if latest post is within 2 years
+                  current_time = datetime.now(timezone.utc)
+                  two_years_ago = current_time.replace(year=current_time.year - 2)
+                  
+                  latest_entry = feed.entries[0]
+                  entry_date = None
+                  
+                  # Try to parse entry date
+                  if hasattr(latest_entry, 'published'):
+                      try:
+                          parsed = parsedate_tz(latest_entry.published)
+                          if parsed:
+                              entry_date = datetime.fromtimestamp(time.mktime(parsed[:9]), timezone.utc)
+                      except:
+                          pass
+                  
+                  if not entry_date and hasattr(latest_entry, 'updated'):
+                      try:
+                          parsed = parsedate_tz(latest_entry.updated)
+                          if parsed:
+                              entry_date = datetime.fromtimestamp(time.mktime(parsed[:9]), timezone.utc)
+                      except:
+                          pass
+                  
+                  if entry_date:
+                      if entry_date < two_years_ago:
+                          print(f'  ❌ Latest post is too old: {entry_date.strftime(\"%Y-%m-%d\")} (older than 2 years)')
+                          return False
+                      else:
+                          print(f'  ✅ Latest post date: {entry_date.strftime(\"%Y-%m-%d\")} (within 2 years)')
+                  else:
+                      print(f'  ⚠️  Could not parse entry date, but feed is accessible')
+                  
+                  # Check feed title
+                  if hasattr(feed.feed, 'title'):
+                      print(f'  📝 Feed title: {feed.feed.title}')
+                  
+                  return True
+                  
+              except Exception as e:
+                  print(f'  ❌ Feed parsing error: {e}')
+                  return False
+          
+          # Get changed feeds from environment
+          changed_feeds = '${{ steps.changed-feeds.outputs.changed_feeds }}'.split(',')
+          changed_feeds = [url.strip() for url in changed_feeds if url.strip()]
+          
+          print(f'📋 Validating {len(changed_feeds)} changed feed(s)...')
+          print('=' * 60)
+          
+          failed_feeds = []
+          
+          for url in changed_feeds:
+              if not validate_feed(url):
+                  failed_feeds.append(url)
+              print()
+          
+          print('=' * 60)
+          
+          if failed_feeds:
+              print(f'❌ {len(failed_feeds)} feed(s) failed validation:')
+              for url in failed_feeds:
+                  print(f'  - {url}')
+              sys.exit(1)
+          else:
+              print(f'✅ All {len(changed_feeds)} feed(s) passed validation!')
+          "
+
+      - name: Validate all feeds (if no specific changes detected)
+        if: steps.changed-feeds.outputs.has_changes == 'false'
+        run: |
+          echo "ℹ️  No specific feed changes detected, running basic validation..."
+          source .venv/bin/activate
+          python -c "
+          # Basic validation that sources.txt is properly formatted
+          with open('sources.txt', 'r') as f:
+              lines = f.readlines()
+          
+          urls = [line.strip() for line in lines if line.strip() and not line.startswith('#')]
+          
+          print(f'📋 Found {len(urls)} total feeds in sources.txt')
+          
+          # Basic URL format validation
+          invalid_urls = []
+          for url in urls:
+              if not (url.startswith('http://') or url.startswith('https://')):
+                  invalid_urls.append(url)
+          
+          if invalid_urls:
+              print('❌ Invalid URL format found:')
+              for url in invalid_urls:
+                  print(f'  - {url}')
+              exit(1)
+          else:
+              print('✅ All URLs have valid format')
+          "
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.changed-feeds.outputs.has_changes }}" == "true" ]; then
+            echo "✅ Feed validation completed for changed feeds"
+          else
+            echo "✅ Basic format validation completed"
+          fi
+          echo "Ready for merge! 🚀"

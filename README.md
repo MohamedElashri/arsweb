@@ -36,6 +36,7 @@ make venv      # إنشاء البيئة وتثبيت المكتبات
 make fonts     # تحميل الخطوط محلياً
 make fetch     # جلب الخلاصات
 make build     # إنشاء الموقع
+make validate  # فحص جودة الخلاصات وحداثتها
 make preview   # فتح في المتصفح
 make deploy    # تنظيف → خطوط → جلب → بناء → فتح
 make clean     # حذف الملفات المُنشأة
@@ -48,6 +49,7 @@ make clean     # حذف الملفات المُنشأة
 │   ├── fetch_feeds.py    # جلب الخلاصات
 │   ├── generate_site.py  # إنشاء الموقع
 │   ├── test_discovery.py # اختبار خوارزمية الاكتشاف
+│   ├── validate_feeds.py # فحص جودة الخلاصات
 │   └── download_fonts.py # تحميل الخطوط محلياً
 ├── templates/            # قوالب Jinja2
 ├── static/               # CSS وأيقونات وخطوط
@@ -58,7 +60,6 @@ make clean     # حذف الملفات المُنشأة
 ## أضف مدونتك
 
 افتح [طلب إضافة](https://github.com/MohamedElashri/asw/issues/new?template=add-blog.yml) مع رابط الخلاصة واسم المدونة.
-
 
 ## الرخصة
 
