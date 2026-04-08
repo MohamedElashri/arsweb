@@ -86,7 +86,7 @@ a:hover {
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.25rem;
   color: var(--text);
   white-space: nowrap;
 }
@@ -97,8 +97,8 @@ a:hover {
 }
 
 .logo-icon {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
 }
 
@@ -181,6 +181,7 @@ a:hover {
   width: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 /* ===== Hero ===== */
@@ -243,7 +244,7 @@ a:hover {
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 80px);
+  height: calc(100vh - 100px);
 }
 
 .discovery-post {
@@ -270,7 +271,7 @@ a:hover {
 
 .discovery-navigation-top {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   padding: 0.5rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -313,7 +314,8 @@ a:hover {
 /* ===== Iframe View ===== */
 .post-iframe {
   height: 100%;
-  min-height: 600px;
+  min-height: calc(100vh - 200px);
+  margin-block-end: 0;
 }
 
 .post-title-compact {
@@ -448,6 +450,7 @@ a:hover {
 .discovery-post .post-summary {
   display: block;
   -webkit-line-clamp: unset;
+  line-clamp: unset;
   overflow: visible;
   max-height: none;
 }
@@ -527,10 +530,10 @@ a:hover {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 1.5rem 1rem;
+  padding: 0.5rem 1rem;
   border-block-start: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 0.825rem;
+  font-size: 0.8rem;
   background: var(--surface);
 }
 
@@ -563,7 +566,7 @@ a:hover {
   }
 
   .main {
-    padding: 1.5rem 1rem 2rem;
+    padding: 0;
   }
 
   .hero {
@@ -598,12 +601,12 @@ a:hover {
   }
 
   .nav-logo {
-    font-size: 0.95rem;
+    font-size: 1.1rem;
   }
 
   .logo-icon {
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
   }
 
   .nav-links {
@@ -659,7 +662,7 @@ a:hover {
   }
 
   .discovery-container {
-    padding: 0 0.5rem;
+    padding: 0;
   }
 
   .discovery-navigation-top {

@@ -1,10 +1,6 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="hero">
-  <h1>الشبكة العربية الصغيرة</h1>
-  <p>اكتشف المدونات العربية الشخصية</p>
-</section>
 
 {% if not all_posts %}
 <section class="discovery-container">
@@ -17,7 +13,7 @@
   <div class="discovery-navigation-top">
     <button class="nav-btn nav-next" id="next-btn">
       <span class="nav-text">التالي</span>
-      <span class="nav-icon">→</span>
+      <span class="nav-icon">←</span>
     </button>
   </div>
   
