@@ -11,6 +11,7 @@ from email.utils import parsedate_tz
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
+from xml.sax.saxutils import escape
 
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
 ARABIC_MONTHS = {
@@ -282,6 +283,49 @@ def apply_discovery_algorithm(all_posts):
     return final_posts
 
 
+def get_rss_posts(cache):
+    """Get posts for RSS feed - chronological order, max 2 per blog."""
+    all_posts = []
+    for site in cache["sites"]:
+        for entry in site["entries"]:
+            all_posts.append(
+                {
+                    **entry,
+                    "site_name": site["name"],
+                    "site_url": site["url"],
+                    "summary": remove_em_dashes(entry.get("summary", "")),
+                    "title": remove_em_dashes(entry.get("title", "")),
+                }
+            )
+    
+    # Filter out posts without valid dates and sort by date
+    valid_posts = []
+    for post in all_posts:
+        post_ts = parse_date_ts(post.get("published", ""))
+        if post_ts > 0:
+            post["timestamp"] = post_ts
+            valid_posts.append(post)
+    
+    # Sort by timestamp (newest first)
+    valid_posts.sort(key=lambda p: p["timestamp"], reverse=True)
+    
+    # Apply max 2 posts per site limit
+    site_count = defaultdict(int)
+    rss_posts = []
+    
+    for post in valid_posts:
+        site_name = post["site_name"]
+        if site_count[site_name] < 2:  # Max 2 posts per site
+            rss_posts.append(post)
+            site_count[site_name] += 1
+            
+            # Limit total posts to 50 for RSS feed
+            if len(rss_posts) >= 50:
+                break
+    
+    return rss_posts
+
+
 def get_all_posts(cache):
     """Get all posts and apply discovery algorithm."""
     all_posts = []
@@ -307,6 +351,52 @@ def get_all_posts(cache):
     return discovery_posts
 
 
+def generate_rss_feed(cache):
+    """Generate RSS feed XML."""
+    rss_posts = get_rss_posts(cache)
+    
+    # RFC 2822 date format for RSS
+    def format_rss_date(timestamp):
+        return datetime.fromtimestamp(timestamp, timezone.utc).strftime('%a, %d %b %Y %H:%M:%S %z')
+    
+    # Build RSS XML
+    rss_items = []
+    for post in rss_posts:
+        title = escape(post.get("title", ""))
+        link = escape(post.get("link", ""))
+        summary = escape(post.get("summary", "")[:500] + "..." if len(post.get("summary", "")) > 500 else post.get("summary", ""))
+        site_name = escape(post.get("site_name", ""))
+        pub_date = format_rss_date(post["timestamp"])
+        
+        item_xml = f"""    <item>
+      <title>{title}</title>
+      <link>{link}</link>
+      <description>{summary}</description>
+      <author>{site_name}</author>
+      <pubDate>{pub_date}</pubDate>
+      <guid>{link}</guid>
+    </item>"""
+        rss_items.append(item_xml)
+    
+    build_date = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S %z')
+    
+    rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>الشبكة العربية الصغيرة</title>
+    <link>https://arsweb.net/</link>
+    <description>مجموعة منتقاة من المدونات والمواقع الشخصية باللغة العربية</description>
+    <language>ar</language>
+    <lastBuildDate>{build_date}</lastBuildDate>
+    <atom:link href="https://arsweb.net/rss.xml" rel="self" type="application/rss+xml"/>
+    <generator>Arabic Small Web</generator>
+{chr(10).join(rss_items)}
+  </channel>
+</rss>"""
+    
+    return rss_xml
+
+
 def render_site(cache):
     env = Environment(
         loader=FileSystemLoader(TEMPLATES_DIR),
@@ -330,6 +420,10 @@ def render_site(cache):
         template = env.get_template(template_name)
         html = template.render(**context)
         (OUTPUT_DIR / out_name).write_text(html, encoding="utf-8")
+
+    # Generate RSS feed
+    rss_xml = generate_rss_feed(cache)
+    (OUTPUT_DIR / "rss.xml").write_text(rss_xml, encoding="utf-8")
 
     if STATIC_DIR.exists():
         for item in STATIC_DIR.iterdir():
