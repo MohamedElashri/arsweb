@@ -1,0 +1,18 @@
+{
+  "discovery": {
+    "max_posts_per_site_daily": 3,
+    "diversity_boost": 0.4,
+    "time_decay_hours": 24,
+    "randomization_factor": 0.1,
+    "discovery_ratio": 0.1,
+    "max_posts_main_page": 100
+  },
+  "description": {
+    "max_posts_per_site_daily": "Maximum posts per site shown in the daily feed (prevents dominance)",
+    "diversity_boost": "Boost factor for less active sites (0.0-1.0, higher = more diversity)",
+    "time_decay_hours": "Hours for exponential time decay (lower = favor newer posts more)",
+    "randomization_factor": "Amount of randomness to inject (0.0-1.0, higher = more random)",
+    "discovery_ratio": "Ratio of discovery posts vs recent posts (0.0-1.0, higher = more discovery)",
+    "max_posts_main_page": "Maximum posts to show on main page (prevents overwhelming users)"
+  }
+}

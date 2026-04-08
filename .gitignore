@@ -1,7 +1,27 @@
+# Virtual environment
 .venv/
+
+# Generated files
 public/
 feed_cache.json
+
+# Python cache files
 __pycache__/
 *.pyc
+*.pyo
 scripts/__pycache__/
+
+# Temporary files
+*.tmp
+*~
+.DS_Store
+
+# Debug files
+debug_*.py
+test_*.py.bak
+*_debug.py
+
+# Old/backup files
+*.old
+*.bak
 sources.json

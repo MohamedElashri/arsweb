@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).parent.parent
 SOURCES_FILE = ROOT / "sources.txt"
 CACHE_FILE = ROOT / "feed_cache.json"
-MAX_POSTS_PER_SITE = 5
-MAX_POSTS_TOTAL = 500
+MAX_POSTS_PER_SITE = 10  # Increased to give discovery algorithm more content
+MAX_POSTS_TOTAL = 800   # Increased total to support discovery
 
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
 
@@ -72,7 +72,7 @@ def fetch_feed(feed_url):
         if hasattr(entry, "summary") and entry.summary:
             summary = re.sub(r"<[^>]+>", "", entry.summary)
             summary = html.unescape(summary)
-            summary = summary[:500].strip()
+            summary = summary[:1500].strip()  # Increased from 500 to 1500 characters
 
         if not summary:
             continue

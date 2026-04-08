@@ -172,35 +172,57 @@ a:hover {
   display: block;
 }
 
-/* ===== Main ===== */
+/* ===== Main Layout ===== */
 .main {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 2.5rem 1rem 3rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   flex: 1;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ===== Hero ===== */
 .hero {
   text-align: center;
-  padding: 2.5rem 0 2rem;
+  padding: 0.5rem 1rem 0.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .hero h1 {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  margin-block-end: 0.5rem;
-  line-height: 1.2;
+  margin-block-end: 0.25rem;
+  line-height: 1.1;
 }
 
 .hero p {
   color: var(--text-muted);
-  font-size: 1rem;
-  margin-block-end: 0.75rem;
+  font-size: 0.85rem;
+  margin-block-end: 0;
   max-width: 520px;
   margin-inline: auto;
+}
+
+.discovery-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-block-end: 1rem;
+  box-shadow: var(--shadow-md);
+}
+
+.badge-icon {
+  font-size: 1rem;
 }
 
 .stats {
@@ -213,7 +235,137 @@ a:hover {
   margin: 0 0.3rem;
 }
 
-/* ===== Posts ===== */
+/* ===== Discovery Container ===== */
+.discovery-container {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 80px);
+}
+
+.discovery-post {
+  flex: 1;
+  margin: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  height: 100%;
+}
+
+.discovery-post .post {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.discovery-navigation-top {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.nav-btn:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+.nav-icon {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+
+/* ===== Iframe View ===== */
+.post-iframe {
+  height: 100%;
+  min-height: 600px;
+}
+
+.post-title-compact {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-block-end: 0;
+  line-height: 1.3;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.post-title-compact a {
+  color: var(--text);
+}
+
+.post-title-compact a:hover {
+  color: var(--accent);
+}
+
+.external-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.external-link:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.iframe-container {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+  background: white;
+  min-height: 0;
+}
+
+
+.iframe-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
 .posts {
   margin-block: 1.5rem;
 }
@@ -235,11 +387,14 @@ a:hover {
 
 .post-meta {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  gap: 0.75rem;
-  margin-block-end: 0.5rem;
-  font-size: 0.8rem;
+  gap: 1rem;
+  margin-block-end: 0;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .post-site {
@@ -284,12 +439,38 @@ a:hover {
 
 .post-summary {
   color: var(--text-muted);
-  font-size: 0.9rem;
-  line-height: 1.65;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-size: 1rem;
+  line-height: 1.7;
+  flex: 1;
+  margin-block-end: 1rem;
+}
+
+.discovery-post .post-summary {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  max-height: none;
+}
+
+/* ===== Discovery Posts ===== */
+.post-discovery {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(135deg, var(--surface) 0%, rgba(37, 99, 235, 0.02) 100%);
+}
+
+.discovery-indicator {
+  background: var(--accent);
+  color: white;
+  padding: 0.15rem 0.3rem;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  margin-inline-start: 0.5rem;
+  cursor: help;
+}
+
+[data-theme="dark"] .post-discovery {
+  background: linear-gradient(135deg, var(--surface) 0%, rgba(88, 166, 255, 0.05) 100%);
 }
 
 .empty {
@@ -299,97 +480,6 @@ a:hover {
   font-size: 1rem;
 }
 
-/* ===== All blogs link (index) ===== */
-.all-blogs-link {
-  text-align: center;
-  margin-block: 2rem;
-}
-
-.all-blogs-link a {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 0.6rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  transition: border-color 0.2s, background 0.2s;
-}
-
-.all-blogs-link a:hover {
-  border-color: var(--accent);
-  background: var(--bg);
-  text-decoration: none;
-}
-
-/* ===== All blogs page ===== */
-.all-blogs {
-  margin-block: 1rem;
-}
-
-.all-blogs h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-block-end: 1.5rem;
-  text-align: center;
-}
-
-.all-blogs table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--surface);
-  border-radius: var(--radius);
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-
-.all-blogs th {
-  text-align: start;
-  padding: 0.85rem 1rem;
-  background: var(--bg);
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-block-end: 1px solid var(--border);
-}
-
-.all-blogs td {
-  padding: 0.85rem 1rem;
-  border-block-end: 1px solid var(--border);
-}
-
-.all-blogs td a {
-  color: var(--text);
-  font-weight: 500;
-}
-
-.all-blogs td a:hover {
-  color: var(--accent);
-}
-
-.all-blogs .url-link {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  font-weight: 400;
-  word-break: break-all;
-}
-
-.all-blogs .url-link:hover {
-  color: var(--accent);
-}
-
-.all-blogs tr:last-child td {
-  border-block-end: none;
-}
-
-.all-blogs tr:hover {
-  background: var(--bg);
-}
 
 /* ===== About ===== */
 .about {
@@ -487,6 +577,15 @@ a:hover {
   .post {
     padding: 1.25rem;
   }
+
+  .discovery-navigation-top {
+    padding: 0.5rem;
+  }
+
+  .nav-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
 }
 
 /* ===== Responsive: Phone ===== */
@@ -559,6 +658,28 @@ a:hover {
     gap: 0.25rem;
   }
 
+  .discovery-container {
+    padding: 0 0.5rem;
+  }
+
+  .discovery-navigation-top {
+    padding: 0.25rem;
+  }
+
+  .nav-btn {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+  }
+
+  .nav-text {
+    display: none;
+  }
+
+  .iframe-container {
+    flex: 1;
+    min-height: 0;
+  }
+
   .about {
     padding: 1.25rem;
   }
@@ -571,8 +692,4 @@ a:hover {
     font-size: 1rem;
   }
 
-  .all-blogs th,
-  .all-blogs td {
-    padding: 0.65rem 0.75rem;
-  }
 }

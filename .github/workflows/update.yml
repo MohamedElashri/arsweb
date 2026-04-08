@@ -34,14 +34,75 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v3
 
+      - name: Cache Python dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: ${{ runner.os }}-python-3.12-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-python-3.12-
+
       - name: Install deps
         run: make venv
 
+      - name: Validate configuration
+        run: |
+          source .venv/bin/activate
+          python -c "
+          import json
+          from pathlib import Path
+          
+          # Validate discovery config
+          config_file = Path('discovery_config.json')
+          if config_file.exists():
+              with open(config_file) as f:
+                  config = json.load(f)
+                  print(f'✅ Discovery config loaded: {len(config)} sections')
+          else:
+              print('⚠️  Using default discovery config')
+          
+          # Validate sources
+          sources_file = Path('sources.txt')
+          if sources_file.exists():
+              sources = sources_file.read_text().strip().split('\n')
+              sources = [s for s in sources if s.strip() and not s.startswith('#')]
+              print(f'✅ Found {len(sources)} RSS sources')
+          else:
+              raise FileNotFoundError('sources.txt not found')
+          "
+
       - name: Fetch feeds
-        run: make fetch
+        run: |
+          make fetch || {
+            echo "⚠️ Feed fetching encountered errors, but continuing with available data"
+            if [ ! -f "feed_cache.json" ]; then
+              echo "❌ No feed cache available, cannot proceed"
+              exit 1
+            fi
+          }
 
       - name: Generate site
         run: make build
+
+      - name: Show feed statistics
+        run: |
+          source .venv/bin/activate
+          python scripts/test_discovery.py | head -20
+
+      - name: Validate generated site
+        run: |
+          if [ ! -f "public/index.html" ]; then
+            echo "❌ Site generation failed - index.html not found"
+            exit 1
+          fi
+          
+          if [ ! -f "public/about.html" ]; then
+            echo "❌ Site generation failed - about.html not found"
+            exit 1
+          fi
+          
+          echo "✅ Site generated successfully"
+          ls -la public/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

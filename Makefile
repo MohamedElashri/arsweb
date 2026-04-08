@@ -8,7 +8,7 @@ ACTIVATE = source $(VENV)/bin/activate
 help:
 	@echo "Available commands:"
 	@echo "  make venv      Create virtual environment and install deps"
-	@echo "  make fetch     Fetch RSS feeds from sources.json"
+	@echo "  make fetch     Fetch RSS feeds from sources.txt"
 	@echo "  make build     Generate static site"
 	@echo "  make clean     Remove generated output"
 	@echo "  make preview   Open generated site in browser"

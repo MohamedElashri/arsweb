@@ -3,38 +3,135 @@
 {% block content %}
 <section class="hero">
   <h1>الشبكة العربية الصغيرة</h1>
-  <p>مجموعة منتقاة من المدونات والمواقع الشخصية باللغة العربية</p>
-  <div class="stats">
-    <span>{{ cache.sites_count }} مدونات</span>
-    <span>·</span>
-    <span>{{ cache.posts_count }} منشورات</span>
+  <p>اكتشف المدونات العربية الشخصية</p>
+</section>
+
+{% if not all_posts %}
+<section class="discovery-container">
+  <p class="empty">لم يتم العثور على منشورات. حاول جلب الخلاصات أولاً.</p>
+</section>
+{% else %}
+
+<!-- Single Post Discovery Container -->
+<section class="discovery-container">
+  <div class="discovery-navigation-top">
+    <button class="nav-btn nav-next" id="next-btn">
+      <span class="nav-text">التالي</span>
+      <span class="nav-icon">→</span>
+    </button>
+  </div>
+  
+  <div class="discovery-post" id="current-post">
+    <!-- Post will be loaded here by JavaScript -->
   </div>
 </section>
 
-<section class="posts">
-  {% if not all_posts %}
-  <p class="empty">لم يتم العثور على منشورات. حاول جلب الخلاصات أولاً.</p>
-  {% else %}
-  {% for post in all_posts %}
-  <article class="post">
-    <div class="post-meta">
-      <a href="{{ post.site_url }}" target="_blank" rel="noopener" class="post-site">{{ post.site_name }}</a>
-      {% if post.published %}
-      <time class="post-date">{{ post.date_ar }}</time>
-      {% endif %}
-    </div>
-    <h2 class="post-title">
-      {% if post.link %}
-      <a href="{{ post.link }}" target="_blank" rel="noopener">{{ post.title }}</a>
-      {% else %}
-      {{ post.title }}
-      {% endif %}
-    </h2>
-    {% if post.summary %}
-    <p class="post-summary">{{ post.summary }}</p>
-    {% endif %}
-  </article>
-  {% endfor %}
-  {% endif %}
-</section>
+<!-- Hidden posts data for JavaScript -->
+<script id="posts-data" type="application/json">
+{{ all_posts | tojson }}
+</script>
+
+<script>
+class DiscoveryFeed {
+  constructor() {
+    this.posts = JSON.parse(document.getElementById('posts-data').textContent);
+    this.currentIndex = 0;
+    this.shuffleOnLoad = true;
+    
+    this.initializeElements();
+    this.setupEventListeners();
+    this.shufflePosts();
+    this.showCurrentPost();
+  }
+  
+  initializeElements() {
+    this.postContainer = document.getElementById('current-post');
+    this.nextBtn = document.getElementById('next-btn');
+  }
+  
+  setupEventListeners() {
+    this.nextBtn.addEventListener('click', () => this.nextPost());
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.nextPost();
+      }
+    });
+  }
+  
+  shufflePosts() {
+    // Fisher-Yates shuffle
+    for (let i = this.posts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.posts[i], this.posts[j]] = [this.posts[j], this.posts[i]];
+    }
+    this.currentIndex = 0;
+    this.showCurrentPost();
+  }
+  
+  nextPost() {
+    if (this.currentIndex < this.posts.length - 1) {
+      this.currentIndex++;
+    } else {
+      // Loop back to beginning when reaching the end
+      this.currentIndex = 0;
+    }
+    this.showCurrentPost();
+  }
+  
+  showCurrentPost() {
+    const post = this.posts[this.currentIndex];
+    
+    const discoveryBadge = post.is_discovery ? 
+      '<span class="discovery-indicator" title="منشور مُكتشف - محتوى متنوع من الأرشيف">🔍</span>' : '';
+    
+    if (post.link) {
+      this.postContainer.innerHTML = `
+        <article class="post ${post.is_discovery ? 'post-discovery' : ''} post-iframe">
+          <div class="post-meta">
+            <a href="${post.site_url}" target="_blank" rel="noopener" class="post-site">${post.site_name}</a>
+            ${discoveryBadge}
+            ${post.published ? `<time class="post-date">${post.date_ar}</time>` : ''}
+            <a href="${post.link}" target="_blank" rel="noopener" class="external-link" title="فتح في نافذة جديدة">🔗</a>
+          </div>
+          <h3 class="post-title-compact">
+            <a href="${post.link}" target="_blank" rel="noopener">${post.title}</a>
+          </h3>
+          <div class="iframe-container">
+            <iframe 
+              src="${post.link}" 
+              title="${post.title}"
+              frameborder="0"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
+              loading="lazy">
+            </iframe>
+          </div>
+        </article>
+      `;
+    } else {
+      // Fallback for posts without links
+      this.postContainer.innerHTML = `
+        <article class="post ${post.is_discovery ? 'post-discovery' : ''}">
+          <div class="post-meta">
+            <a href="${post.site_url}" target="_blank" rel="noopener" class="post-site">${post.site_name}</a>
+            ${discoveryBadge}
+            ${post.published ? `<time class="post-date">${post.date_ar}</time>` : ''}
+          </div>
+          <h2 class="post-title">${post.title}</h2>
+          ${post.summary ? `<p class="post-summary">${post.summary}</p>` : ''}
+        </article>
+      `;
+    }
+  }
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  new DiscoveryFeed();
+});
+</script>
+
+{% endif %}
 {% endblock %}
