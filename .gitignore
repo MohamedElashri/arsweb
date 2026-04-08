@@ -25,3 +25,8 @@ test_*.py.bak
 *.old
 *.bak
 sources.json
+
+# Font files (downloaded, not tracked)
+static/fonts/*.ttf
+static/fonts/*.woff
+static/fonts/*.woff2

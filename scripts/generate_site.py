@@ -290,6 +290,8 @@ def render_site(cache):
         for item in STATIC_DIR.iterdir():
             if item.is_file():
                 shutil.copy2(item, OUTPUT_DIR / item.name)
+            elif item.is_dir():
+                shutil.copytree(item, OUTPUT_DIR / item.name, dirs_exist_ok=True)
 
 
 def main():

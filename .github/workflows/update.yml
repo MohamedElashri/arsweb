@@ -45,6 +45,9 @@ jobs:
       - name: Install deps
         run: make venv
 
+      - name: Download fonts
+        run: make fonts
+
       - name: Validate configuration
         run: |
           source .venv/bin/activate
