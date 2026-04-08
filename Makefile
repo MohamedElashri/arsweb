@@ -16,7 +16,13 @@ help:
 	@echo "  make deploy    Run full pipeline and open result"
 
 venv:
-	uv venv $(VENV)
+	@if [ -d "$(VENV)" ]; then \
+		echo "Virtual environment exists, clearing..."; \
+		uv venv $(VENV) --clear; \
+	else \
+		echo "Creating new virtual environment..."; \
+		uv venv $(VENV); \
+	fi
 	$(ACTIVATE) && uv pip install -r requirements.txt
 
 fonts:
