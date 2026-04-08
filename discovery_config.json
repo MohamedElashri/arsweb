@@ -3,8 +3,8 @@
     "max_posts_per_site_daily": 3,
     "diversity_boost": 0.4,
     "time_decay_hours": 24,
-    "randomization_factor": 0.1,
-    "discovery_ratio": 0.1,
+    "randomization_factor": 0.2,
+    "discovery_ratio": 0.0,
     "max_posts_main_page": 100
   },
   "description": {

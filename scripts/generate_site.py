@@ -36,8 +36,8 @@ DEFAULT_DISCOVERY_CONFIG = {
     "max_posts_per_site_daily": 3,  # Max posts per site in the feed per day
     "diversity_boost": 0.4,  # Boost factor for less active sites
     "time_decay_hours": 24,  # Hours for exponential time decay
-    "randomization_factor": 0.1,  # How much randomness to inject
-    "discovery_ratio": 0.1,  # Ratio of older/diverse posts vs recent posts
+    "randomization_factor": 0.2,  # How much randomness to inject
+    "discovery_ratio": 0.0,  # Not used in new algorithm (current year priority)
     "max_posts_main_page": 100,  # Maximum posts to show on main page
 }
 
@@ -118,15 +118,14 @@ def calculate_post_score(post, site_stats, now_ts, config):
     
     # Time decay factor (newer posts get higher base score)
     post_ts = parse_date_ts(post.get("published", ""))
-    if post_ts == 0:
-        post_ts = now_ts  # Fallback for posts without dates
+    # Don't fallback to current time - let strict parsing handle it
     
     # Get current year and post year for absolute preference
     from datetime import datetime
     current_year = datetime.now().year
     
-    # More robust date parsing
-    post_year = current_year  # Default to current year if parsing fails
+    # More robust date parsing - be strict
+    post_year = None
     try:
         if post_ts > 0:
             post_date = datetime.fromtimestamp(post_ts)
@@ -151,18 +150,25 @@ def calculate_post_score(post, site_stats, now_ts, config):
                         post_date = datetime.fromtimestamp(time.mktime(parsed[:9]))
                         post_year = post_date.year
     except Exception as e:
-        # If all parsing fails, default to current year to give benefit of doubt
-        post_year = current_year
+        pass
     
-    # Year-based multiplier (absolute preference for current year)
+    # If we can't parse the date, exclude the post
+    if post_year is None:
+        return 0.0
+    
+    # STRICT FILTERING: Exclude posts older than 2 years
+    if post_year < current_year - 2:
+        return 0.0  # Completely exclude old posts
+    
+    # Year-based multiplier with strict current year preference
     if post_year == current_year:
-        year_multiplier = 10.0  # 10x boost for current year posts
+        year_multiplier = 100.0  # Massive boost for current year posts
     elif post_year == current_year - 1:
-        year_multiplier = 3.0   # 3x boost for last year posts
-    elif post_year >= current_year - 2:
-        year_multiplier = 1.5   # 1.5x boost for posts within 2 years
+        year_multiplier = 1.0    # Normal score for last year
+    elif post_year == current_year - 2:
+        year_multiplier = 0.1    # Very low score for 2 years ago
     else:
-        year_multiplier = 0.1   # Heavily penalize older posts
+        return 0.0  # Should not reach here due to filtering above
     
     # Standard time decay within the year
     hours_old = (now_ts - post_ts) / 3600
@@ -186,54 +192,93 @@ def apply_discovery_algorithm(all_posts):
     """Apply discovery algorithm to create a diverse, discovery-focused feed."""
     config = load_discovery_config()
     now_ts = datetime.now(timezone.utc).timestamp()
-    
+    current_year = datetime.now().year
+
     # Calculate site statistics
     site_stats = defaultdict(int)
     for post in all_posts:
         site_stats[post["site_name"]] += 1
-    
-    # Calculate scores for all posts
+
+    # Calculate scores for all posts and filter by age
+    scored_posts = []
     for post in all_posts:
-        post["discovery_score"] = calculate_post_score(post, site_stats, now_ts, config)
+        score = calculate_post_score(post, site_stats, now_ts, config)
+        if score > 0:  # Only include posts that pass the age filter
+            post["discovery_score"] = score
+            scored_posts.append(post)
+
+    # Separate posts by year
+    current_year_posts = []
+    older_posts = []
     
-    # Sort by discovery score
-    all_posts.sort(key=lambda p: p["discovery_score"], reverse=True)
-    
-    # Apply daily limits per site to prevent dominance
+    for post in scored_posts:
+        # Parse post year - be strict about parsing
+        post_year = None
+        try:
+            post_ts = parse_date_ts(post.get("published", ""))
+            if post_ts > 0:
+                post_date = datetime.fromtimestamp(post_ts)
+                post_year = post_date.year
+        except:
+            pass
+        
+        # Only include posts with valid, parseable dates
+        if post_year == current_year:
+            current_year_posts.append(post)
+        elif post_year is not None:  # Valid year but not current
+            older_posts.append(post)
+        # Posts with unparseable dates are excluded entirely
+
+    # Sort each group by discovery score
+    current_year_posts.sort(key=lambda p: p["discovery_score"], reverse=True)
+    older_posts.sort(key=lambda p: p["discovery_score"], reverse=True)
+
+    # Apply daily limits per site for current year posts first
     site_daily_count = defaultdict(int)
-    filtered_posts = []
+    final_current_year = []
     
-    for post in all_posts:
+    for post in current_year_posts:
         site_name = post["site_name"]
         if site_daily_count[site_name] < config["max_posts_per_site_daily"]:
-            filtered_posts.append(post)
+            final_current_year.append(post)
             site_daily_count[site_name] += 1
+
+    # Shuffle current year posts for randomness
+    random.shuffle(final_current_year)
     
-    # Limit total posts for main page
-    max_posts = config.get("max_posts_main_page", 24)
-    filtered_posts = filtered_posts[:max_posts]
-    
-    # Split into recent and discovery sections
-    total_posts = len(filtered_posts)
-    discovery_count = int(total_posts * config["discovery_ratio"])
-    recent_count = total_posts - discovery_count
-    
-    # Recent posts (higher discovery scores)
-    recent_posts = filtered_posts[:recent_count]
-    for post in recent_posts:
+    # Mark current year posts as recent
+    for post in final_current_year:
         post["is_discovery"] = False
+
+    # Only add older posts if we need more content to reach max_posts
+    max_posts = config.get("max_posts_main_page", 100)
+    final_posts = final_current_year.copy()
     
-    # Discovery posts (mix of older and diverse content)
-    discovery_posts = filtered_posts[recent_count:recent_count + discovery_count]
-    for post in discovery_posts:
-        post["is_discovery"] = True
-    
-    # Shuffle discovery posts for more randomness
-    random.shuffle(discovery_posts)
-    
-    # Combine and return
-    final_posts = recent_posts + discovery_posts
-    
+    if len(final_posts) < max_posts:
+        # Add older posts to fill remaining slots
+        remaining_slots = max_posts - len(final_posts)
+        
+        # Reset site count for older posts (but respect the limit)
+        older_filtered = []
+        for post in older_posts:
+            site_name = post["site_name"]
+            if site_daily_count[site_name] < config["max_posts_per_site_daily"]:
+                older_filtered.append(post)
+                site_daily_count[site_name] += 1
+                
+                if len(older_filtered) >= remaining_slots:
+                    break
+        
+        # Mark older posts as discovery
+        for post in older_filtered:
+            post["is_discovery"] = True
+        
+        # Shuffle older posts
+        random.shuffle(older_filtered)
+        
+        # Add to final list
+        final_posts.extend(older_filtered)
+
     return final_posts
 
 
