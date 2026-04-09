@@ -45,3 +45,7 @@ https://abuereem.com/feed/
 https://www.hma-algaith.com/feed/
 https://bethjosef.com/blog/feed/
 https://tariqk.me/feed/
+https://fariszr.com/index.xml
+https://abotyim.github.io/ar/index.xml
+https://eltabarani.com/rss.xml
+https://iwatheq.com/feed.xml
