@@ -104,15 +104,30 @@ class DiscoveryFeed {
               loading="lazy">
             </iframe>
           </div>
-          <div class="post-actions">
+          <div class="post-actions" id="post-actions">
             <span class="notice-icon">ℹ️</span>
             <span class="notice-text">إذا لم تُحمَّل الصفحة، فقد يمنع متصفحك أو الموقع الأصلي التضمين</span>
             <a href="${post.link}" target="_blank" rel="noopener" class="read-more-btn">
               قراءة المقال ↗
             </a>
+            <button class="close-actions" id="close-actions" aria-label="إخفاء">✕</button>
           </div>
         </article>
       `;
+
+      // Dismissible actions bar
+      const actionsBar = this.postContainer.querySelector('#post-actions');
+      const closeBtn = this.postContainer.querySelector('#close-actions');
+
+      // Restore dismissed state
+      if (localStorage.getItem('hide-post-actions') === 'true') {
+        actionsBar.style.display = 'none';
+      }
+
+      closeBtn.addEventListener('click', () => {
+        actionsBar.style.display = 'none';
+        localStorage.setItem('hide-post-actions', 'true');
+      });
     } else {
       // Fallback for posts without links
       this.postContainer.innerHTML = `

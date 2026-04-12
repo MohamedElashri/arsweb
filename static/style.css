@@ -497,7 +497,6 @@ a:hover {
   font-size: 0.75rem;
   text-decoration: none;
   transition: background 0.2s, transform 0.15s;
-  margin-inline-start: auto;
   flex-shrink: 0;
 }
 
@@ -505,6 +504,25 @@ a:hover {
   background: var(--accent-hover);
   color: white;
   transform: translateY(-1px);
+}
+
+.close-actions {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+  margin-inline-start: auto;
+}
+
+.close-actions:hover {
+  color: var(--text);
+  background: var(--bg);
 }
 
 .posts {
@@ -754,6 +772,23 @@ a:hover {
     padding: 0.2rem 0.6rem;
     font-size: 0.7rem;
   }
+
+  .post-title-inline {
+    font-size: 0.9rem;
+    min-width: 0;
+  }
+
+  .post-title-inline a {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .close-actions {
+    font-size: 0.8rem;
+    padding: 0.1rem 0.3rem;
+  }
 }
 
 /* ===== Responsive: Phone ===== */
@@ -831,7 +866,16 @@ a:hover {
   }
 
   .post-title-inline {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
+    min-width: 0;
+  }
+
+  .post-title-inline a {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 50vw;
   }
 
   .discovery-container {
@@ -852,22 +896,23 @@ a:hover {
     display: none;
   }
 
-  .post-title-inline {
-    font-size: 0.8rem;
-  }
-
   .post-actions {
-    padding: 0.25rem 0.5rem;
+    padding: 0.2rem 0.35rem;
     gap: 0.25rem;
   }
 
   .notice-text {
-    font-size: 0.65rem;
+    display: none;
   }
 
   .post-actions .read-more-btn {
-    padding: 0.15rem 0.5rem;
-    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .close-actions {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.25rem;
   }
 
   .about {
