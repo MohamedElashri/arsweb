@@ -283,8 +283,8 @@ a:hover {
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - var(--header-height) - 40px);
-  height: calc(100dvh - var(--header-height) - 40px);
+  height: calc(100vh - var(--header-height) - 30px);
+  height: calc(100dvh - var(--header-height) - 30px);
   overflow: hidden;
 }
 
@@ -352,30 +352,99 @@ a:hover {
 }
 
 
-/* ===== Iframe View ===== */
-.post-iframe {
-  height: 100%;
-  min-height: calc(100vh - 200px);
-  min-height: calc(100dvh - 200px);
-  margin-block-end: 0;
-}
-
-.post-title-compact {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin-block-end: 0;
-  line-height: 1.3;
+/* ===== Post Header (combined meta + title) ===== */
+.post-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.5rem 0.75rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  min-height: 44px;
 }
 
-.post-title-compact a {
-  color: var(--text);
+.post-header .post-site {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
-.post-title-compact a:hover {
+.post-header .post-site:hover {
   color: var(--accent);
+}
+
+.post-header .post-date {
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  background: var(--bg);
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.post-header .external-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+
+.post-header .external-link:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.post-header .discovery-indicator {
+  background: var(--accent);
+  color: white;
+  padding: 0.15rem 0.3rem;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.post-title-inline {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.3;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.post-title-inline a {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.post-title-inline a:hover {
+  color: var(--accent);
+}
+
+/* ===== Iframe View ===== */
+.post-iframe {
+  height: 100%;
+  min-height: 0;
+  margin-block-end: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .external-link {
@@ -395,12 +464,12 @@ a:hover {
 .iframe-container {
   position: relative;
   width: 100%;
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   border: none;
   border-radius: 0;
   overflow: hidden;
   background: white;
-  min-height: 300px;
 }
 
 [data-theme="dark"] .iframe-container {
@@ -578,13 +647,14 @@ a:hover {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
+  padding: 0.25rem 1rem;
   border-block-start: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   background: var(--surface);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  flex-shrink: 0;
 }
 
 [data-theme="dark"] .site-footer {
@@ -646,8 +716,8 @@ a:hover {
   }
 
   .discovery-container {
-    height: calc(100vh - var(--header-height) - 35px);
-    height: calc(100dvh - var(--header-height) - 35px);
+    height: calc(100vh - var(--header-height) - 28px);
+    height: calc(100dvh - var(--header-height) - 28px);
   }
 
   .iframe-container {
@@ -720,18 +790,18 @@ a:hover {
     font-size: 1.05rem;
   }
 
-  .post-meta {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.7rem;
+  .post-header {
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
   }
 
-  .post-date {
-    font-size: 0.8rem;
+  .post-header .post-date {
+    font-size: 0.75rem;
     padding: 0.1rem 0.4rem;
+  }
+
+  .post-title-inline {
+    font-size: 0.85rem;
   }
 
   .post-title-compact {
@@ -741,8 +811,8 @@ a:hover {
 
   .discovery-container {
     padding: 0;
-    height: calc(100vh - 120px);
-    height: calc(100dvh - 120px);
+    height: calc(100vh - 110px);
+    height: calc(100dvh - 110px);
   }
 
   .discovery-navigation-top {
@@ -759,8 +829,8 @@ a:hover {
   }
 
   .post-iframe {
-    min-height: calc(100vh - 180px);
-    min-height: calc(100dvh - 180px);
+    min-height: calc(100vh - 160px);
+    min-height: calc(100dvh - 160px);
   }
 
   .iframe-container {

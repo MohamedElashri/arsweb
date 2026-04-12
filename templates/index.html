@@ -86,18 +86,18 @@ class DiscoveryFeed {
     if (post.link) {
       this.postContainer.innerHTML = `
         <article class="post ${post.is_discovery ? 'post-discovery' : ''} post-iframe">
-          <div class="post-meta">
+          <div class="post-header">
             <a href="${post.site_url}" target="_blank" rel="noopener" class="post-site">${post.site_name}</a>
             ${discoveryBadge}
             ${post.published ? `<time class="post-date">${post.date_ar}</time>` : ''}
             <a href="${post.link}" target="_blank" rel="noopener" class="external-link" title="فتح في نافذة جديدة">🔗</a>
+            <h3 class="post-title-inline">
+              <a href="${post.link}" target="_blank" rel="noopener">${post.title}</a>
+            </h3>
           </div>
-          <h3 class="post-title-compact">
-            <a href="${post.link}" target="_blank" rel="noopener">${post.title}</a>
-          </h3>
           <div class="iframe-container">
-            <iframe 
-              src="${post.link}" 
+            <iframe
+              src="${post.link}"
               title="${post.title}"
               frameborder="0"
               sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
