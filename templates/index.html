@@ -85,15 +85,15 @@ class DiscoveryFeed {
     
     if (post.link) {
       this.postContainer.innerHTML = `
-        <article class="post ${post.is_discovery ? 'post-discovery' : ''} post-iframe">
+        <article class="post ${post.is_discovery ? 'post-discovery' : ''}">
           <div class="post-header">
+            <h3 class="post-title-inline">
+              <a href="${post.link}" target="_blank" rel="noopener">${post.title}</a>
+            </h3>
             <a href="${post.site_url}" target="_blank" rel="noopener" class="post-site">${post.site_name}</a>
             ${discoveryBadge}
             ${post.published ? `<time class="post-date">${post.date_ar}</time>` : ''}
             <a href="${post.link}" target="_blank" rel="noopener" class="external-link" title="فتح في نافذة جديدة">🔗</a>
-            <h3 class="post-title-inline">
-              <a href="${post.link}" target="_blank" rel="noopener">${post.title}</a>
-            </h3>
           </div>
           <div class="iframe-container">
             <iframe
@@ -103,6 +103,13 @@ class DiscoveryFeed {
               sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
               loading="lazy">
             </iframe>
+          </div>
+          <div class="post-actions">
+            <span class="notice-icon">ℹ️</span>
+            <span class="notice-text">إذا لم تُحمَّل الصفحة، فقد يمنع متصفحك أو الموقع الأصلي التضمين</span>
+            <a href="${post.link}" target="_blank" rel="noopener" class="read-more-btn">
+              قراءة المقال ↗
+            </a>
           </div>
         </article>
       `;
