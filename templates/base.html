@@ -28,8 +28,15 @@
 
   <script>
     (function() {
-      const theme = localStorage.getItem('theme');
-      if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      let theme = null;
+      try {
+        theme = localStorage.getItem('theme');
+      } catch (error) {
+        theme = null;
+      }
+
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (theme === 'dark' || (!theme && prefersDark)) {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
     })();
@@ -71,7 +78,9 @@
       const html = document.documentElement;
       const isDark = html.getAttribute('data-theme') === 'dark';
       html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-      localStorage.setItem('theme', isDark ? 'light' : 'dark');
+      try {
+        localStorage.setItem('theme', isDark ? 'light' : 'dark');
+      } catch (error) {}
     });
   </script>
 </body>

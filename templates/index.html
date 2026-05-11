@@ -3,152 +3,148 @@
 {% block content %}
 
 {% if not all_posts %}
-<section class="discovery-container">
+<section class="viewer">
   <p class="empty">لم يتم العثور على منشورات. حاول جلب الخلاصات أولاً.</p>
 </section>
 {% else %}
+{% set featured = all_posts[0] %}
 
-<!-- Single Post Discovery Container -->
-<section class="discovery-container">
-  <div class="discovery-navigation-top">
-    <button class="nav-btn nav-next" id="next-btn">
-      <span class="nav-text">التالي</span>
+<section class="viewer">
+  <div class="viewer-bar">
+    <button class="nav-btn" id="next-btn" type="button" title="منشور عشوائي آخر (مفتاح المسافة)">
       <span class="nav-icon">←</span>
+      <span>التالي</span>
     </button>
+
+    <div class="viewer-title-wrap">
+      <h3 class="viewer-title">
+        <a id="post-title-link" href="{{ featured.link }}" target="_blank" rel="noopener">{{ featured.title }}</a>
+      </h3>
+      <div class="viewer-meta">
+        <a id="post-site" href="{{ featured.site_url }}" target="_blank" rel="noopener">{{ featured.site_name }}</a>
+        <time id="post-date"{% if not featured.published %} hidden{% endif %}>{{ featured.date_ar }}</time>
+      </div>
+    </div>
+
+    <a id="read-more" href="{{ featured.link }}" target="_blank" rel="noopener" class="read-more-btn">الأصلي ↗</a>
   </div>
-  
-  <div class="discovery-post" id="current-post">
-    <!-- Post will be loaded here by JavaScript -->
+
+  <div class="viewer-content" id="content-area">
+    {% if featured.content %}
+    <div class="reader-view">
+      {{ featured.content | safe }}
+    </div>
+    {% else %}
+    <div class="reader-fallback">
+      <p class="fallback-text">لم نتمكن من استخراج محتوى المقال.</p>
+      <p class="fallback-summary">{{ featured.summary | truncate(800, true, "…") }}</p>
+      <a href="{{ featured.link }}" target="_blank" rel="noopener" class="read-more-btn">قراءة المقال في الموقع الأصلي ↗</a>
+    </div>
+    {% endif %}
   </div>
 </section>
 
-<!-- Hidden posts data for JavaScript -->
 <script id="posts-data" type="application/json">
 {{ all_posts | tojson }}
 </script>
 
 <script>
-class DiscoveryFeed {
-  constructor() {
-    this.posts = JSON.parse(document.getElementById('posts-data').textContent);
-    this.currentIndex = 0;
-    this.shuffleOnLoad = true;
-    
-    this.initializeElements();
-    this.setupEventListeners();
-    this.shufflePosts();
-    this.showCurrentPost();
+(function() {
+  const data = document.getElementById('posts-data');
+  const nextButton = document.getElementById('next-btn');
+
+  if (!data || !nextButton) return;
+
+  let posts = [];
+  try {
+    posts = JSON.parse(data.textContent);
+  } catch (e) {
+    nextButton.disabled = true;
+    return;
   }
-  
-  initializeElements() {
-    this.postContainer = document.getElementById('current-post');
-    this.nextBtn = document.getElementById('next-btn');
+
+  if (!posts.length) {
+    nextButton.disabled = true;
+    return;
   }
-  
-  setupEventListeners() {
-    this.nextBtn.addEventListener('click', () => this.nextPost());
-    
-    // Keyboard navigation
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        this.nextPost();
-      }
-    });
+
+  for (let i = posts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [posts[i], posts[j]] = [posts[j], posts[i]];
   }
-  
-  shufflePosts() {
-    // Fisher-Yates shuffle
-    for (let i = this.posts.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [this.posts[i], this.posts[j]] = [this.posts[j], this.posts[i]];
-    }
-    this.currentIndex = 0;
-    this.showCurrentPost();
-  }
-  
-  nextPost() {
-    if (this.currentIndex < this.posts.length - 1) {
-      this.currentIndex++;
+
+  let currentIndex = 0;
+  const nodes = {
+    title: document.getElementById('post-title-link'),
+    site: document.getElementById('post-site'),
+    date: document.getElementById('post-date'),
+    contentArea: document.getElementById('content-area'),
+    readMore: document.getElementById('read-more')
+  };
+
+  function setHref(node, value) {
+    if (!node) return;
+    if (value) {
+      node.href = value;
+      node.hidden = false;
     } else {
-      // Loop back to beginning when reaching the end
-      this.currentIndex = 0;
+      node.removeAttribute('href');
+      node.hidden = true;
     }
-    this.showCurrentPost();
   }
-  
-  showCurrentPost() {
-    const post = this.posts[this.currentIndex];
-    
-    const discoveryBadge = post.is_discovery ? 
-      '<span class="discovery-indicator" title="منشور مُكتشف - محتوى متنوع من الأرشيف">🔍</span>' : '';
-    
-    if (post.link) {
-      this.postContainer.innerHTML = `
-        <article class="post ${post.is_discovery ? 'post-discovery' : ''}">
-          <div class="post-header">
-            <h3 class="post-title-inline">
-              <a href="${post.link}" target="_blank" rel="noopener">${post.title}</a>
-            </h3>
-            <a href="${post.site_url}" target="_blank" rel="noopener" class="post-site">${post.site_name}</a>
-            ${discoveryBadge}
-            ${post.published ? `<time class="post-date">${post.date_ar}</time>` : ''}
-            <a href="${post.link}" target="_blank" rel="noopener" class="external-link" title="فتح في نافذة جديدة">🔗</a>
-          </div>
-          <div class="iframe-container">
-            <iframe
-              src="${post.link}"
-              title="${post.title}"
-              frameborder="0"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
-              loading="lazy">
-            </iframe>
-          </div>
-          <div class="post-actions" id="post-actions">
-            <span class="notice-icon">ℹ️</span>
-            <span class="notice-text">إذا لم تُحمَّل الصفحة، فقد يمنع متصفحك أو الموقع الأصلي التضمين</span>
-            <a href="${post.link}" target="_blank" rel="noopener" class="read-more-btn">
-              قراءة المقال ↗
-            </a>
-            <button class="close-actions" id="close-actions" aria-label="إخفاء">✕</button>
-          </div>
-        </article>
-      `;
 
-      // Dismissible actions bar
-      const actionsBar = this.postContainer.querySelector('#post-actions');
-      const closeBtn = this.postContainer.querySelector('#close-actions');
+  function showPost(index) {
+    const post = posts[index];
+    if (!post) return;
+    currentIndex = index;
 
-      // Restore dismissed state
-      if (localStorage.getItem('hide-post-actions') === 'true') {
-        actionsBar.style.display = 'none';
-      }
+    nodes.title.textContent = post.title || 'منشور بدون عنوان';
+    if (nodes.site) nodes.site.textContent = post.site_name || 'موقع مستقل';
+    if (nodes.date) {
+      nodes.date.textContent = post.date_ar || '';
+      nodes.date.hidden = !post.date_ar;
+    }
 
-      closeBtn.addEventListener('click', () => {
-        actionsBar.style.display = 'none';
-        localStorage.setItem('hide-post-actions', 'true');
-      });
+    setHref(nodes.title, post.link);
+    setHref(nodes.site, post.site_url);
+    setHref(nodes.readMore, post.link);
+
+    if (post.content) {
+      nodes.contentArea.innerHTML = '<div class="reader-view">' + post.content + '</div>';
     } else {
-      // Fallback for posts without links
-      this.postContainer.innerHTML = `
-        <article class="post ${post.is_discovery ? 'post-discovery' : ''}">
-          <div class="post-meta">
-            <a href="${post.site_url}" target="_blank" rel="noopener" class="post-site">${post.site_name}</a>
-            ${discoveryBadge}
-            ${post.published ? `<time class="post-date">${post.date_ar}</time>` : ''}
-          </div>
-          <h2 class="post-title">${post.title}</h2>
-          ${post.summary ? `<p class="post-summary">${post.summary}</p>` : ''}
-        </article>
-      `;
+      const summary = (post.summary || '').slice(0, 800).trim() + ((post.summary || '').length > 800 ? '…' : '');
+      nodes.contentArea.innerHTML =
+        '<div class="reader-fallback">' +
+        '<p class="fallback-text">لم نتمكن من استخراج محتوى المقال.</p>' +
+        '<p class="fallback-summary">' + escapeHtml(summary) + '</p>' +
+        '<a href="' + (post.link || '') + '" target="_blank" rel="noopener" class="read-more-btn">قراءة المقال في الموقع الأصلي ↗</a>' +
+        '</div>';
     }
-  }
-}
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  new DiscoveryFeed();
-});
+    nodes.contentArea.scrollTop = 0;
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function nextPost() {
+    showPost((currentIndex + 1) % posts.length);
+  }
+
+  nextButton.addEventListener('click', nextPost);
+
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') {
+      event.preventDefault();
+      nextPost();
+    }
+  });
+
+  showPost(0);
+})();
 </script>
 
 {% endif %}

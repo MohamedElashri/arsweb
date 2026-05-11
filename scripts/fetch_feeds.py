@@ -5,11 +5,12 @@ import html
 import json
 import logging
 import re
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import feedparser
+import requests
+from bs4 import BeautifulSoup
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,10 +21,75 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).parent.parent
 SOURCES_FILE = ROOT / "sources.txt"
 CACHE_FILE = ROOT / "feed_cache.json"
-MAX_POSTS_PER_SITE = 10  # Increased to give discovery algorithm more content
-MAX_POSTS_TOTAL = 800   # Increased total to support discovery
+MAX_POSTS_PER_SITE = 10
+MAX_POSTS_TOTAL = 800
+REQUEST_TIMEOUT = 12
+CONTENT_TIMEOUT = 15
+MAX_CONTENT_LENGTH = 30000  # characters
 
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
+
+# Tags to remove entirely
+REMOVE_TAGS = {
+    "script", "style", "nav", "header", "footer", "aside", "form",
+    "iframe", "noscript", "svg", "canvas", "audio", "video", "embed",
+    "object", "template", "button", "input", "textarea", "select",
+    "label", "dialog", "menu", "address", "fieldset", "legend",
+    "optgroup", "option", "datalist", "output", "progress", "meter",
+    "details", "summary", "marquee", "blink", "map", "area",
+    "source", "track", "picture", "del", "ins", "wbr",
+}
+
+# Tags to keep (all others are removed but their text is preserved)
+KEEP_TAGS = {
+    "p", "h1", "h2", "h3", "h4", "h5", "h6",
+    "a", "strong", "b", "em", "i", "blockquote", "q",
+    "ul", "ol", "li", "br", "hr", "img", "figure", "figcaption",
+    "table", "thead", "tbody", "tr", "td", "th", "pre", "code",
+    "div", "span", "article", "main", "section", "dl", "dt", "dd",
+    "sup", "sub", "small", "mark", "s", "u", "abbr", "cite", "dfn",
+    "kbd", "samp", "time", "var", "ruby", "rt", "rp",
+}
+
+# Attributes allowed per tag
+ALLOWED_ATTRS = {
+    "a": {"href", "title"},
+    "img": {"src", "alt", "title", "loading"},
+    "blockquote": {"cite"},
+    "q": {"cite"},
+    "abbr": {"title"},
+    "time": {"datetime"},
+    "td": {"colspan", "rowspan"},
+    "th": {"colspan", "rowspan"},
+}
+
+# CSS selectors to find main content (ordered by preference)
+CONTENT_SELECTORS = [
+    "article",
+    "main",
+    '[role="main"]',
+    ".entry-content",
+    ".post-content",
+    ".content",
+    "#content",
+    ".entry",
+    ".post",
+    ".single-post",
+    ".post__content",
+    ".article-content",
+    ".article-body",
+    ".entry-body",
+    ".post-body",
+    ".story-content",
+    ".page-content",
+    ".main-content",
+    ".site-content",
+    ".blog-post",
+    ".post-entry",
+    ".entry-post",
+    ".postarticle",
+    ".post Article",
+]
 
 
 def has_arabic(text):
@@ -36,6 +102,105 @@ def load_sources():
     with open(SOURCES_FILE, encoding="utf-8") as f:
         urls = [line.strip() for line in f if line.strip() and not line.startswith("#")]
     return urls
+
+
+def clean_url(url):
+    """Only allow http/https/mailto URLs."""
+    if not url:
+        return None
+    url = url.strip()
+    if url.startswith("http://") or url.startswith("https://") or url.startswith("mailto:"):
+        return url
+    return None
+
+
+def extract_article_content(url):
+    """Fetch article HTML and extract clean content."""
+    try:
+        resp = requests.get(
+            url,
+            timeout=CONTENT_TIMEOUT,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
+            },
+        )
+        resp.raise_for_status()
+    except Exception as e:
+        logger.debug("Failed to fetch article %s: %s", url, e)
+        return None
+
+    content_type = resp.headers.get("content-type", "").lower()
+    if "text/html" not in content_type and "application/xhtml+xml" not in content_type:
+        return None
+
+    try:
+        soup = BeautifulSoup(resp.text, "html.parser")
+    except Exception as e:
+        logger.debug("Failed to parse HTML for %s: %s", url, e)
+        return None
+
+    # Remove unwanted tags entirely
+    for tag in soup.find_all(REMOVE_TAGS):
+        tag.decompose()
+
+    # Find main content container
+    main_content = None
+    for selector in CONTENT_SELECTORS:
+        try:
+            main_content = soup.select_one(selector)
+        except Exception:
+            continue
+        if main_content:
+            break
+
+    if not main_content:
+        main_content = soup.find("body") or soup
+
+    # Sanitize: remove disallowed tags but keep their text
+    for tag in list(main_content.find_all()):
+        if tag.name not in KEEP_TAGS:
+            tag.unwrap()
+            continue
+
+        # Sanitize attributes: strip classes/ids to avoid CSS conflicts,
+        # keep only allowed attributes
+        allowed = ALLOWED_ATTRS.get(tag.name, set())
+        for attr in list(tag.attrs.keys()):
+            if attr not in allowed:
+                del tag[attr]
+                continue
+            # Validate href/src URLs
+            if attr in ("href", "src"):
+                cleaned = clean_url(tag[attr])
+                if cleaned:
+                    tag[attr] = cleaned
+                else:
+                    del tag[attr]
+
+    # Get HTML string
+    html_str = str(main_content)
+
+    # Remove empty tags recursively
+    prev = None
+    while prev != html_str:
+        prev = html_str
+        html_str = re.sub(r"<([a-zA-Z0-9]+)[^>]*>\s*</\1>", "", html_str)
+        html_str = re.sub(r"<([a-zA-Z0-9]+)[^>]*>\s*</\1>", "", html_str)
+
+    # Collapse excessive whitespace
+    html_str = re.sub(r"\n\s*\n", "\n\n", html_str)
+    html_str = html_str.strip()
+
+    # Truncate if too long
+    if len(html_str) > MAX_CONTENT_LENGTH:
+        html_str = html_str[:MAX_CONTENT_LENGTH].rsplit("</p>", 1)[0] + "</p>"
+
+    if len(html_str) < 200:
+        return None
+
+    return html_str
 
 
 def fetch_feed(feed_url):
@@ -51,7 +216,6 @@ def fetch_feed(feed_url):
         logger.warning("No entries from %s (bozo: %s)", feed_url, feed.bozo_exception)
         return None
 
-    # Extract site name and URL from feed metadata
     site_name = feed.feed.get("title", "").strip() or feed_url
     site_url = feed.feed.get("link", "").strip() or feed_url
 
@@ -72,12 +236,18 @@ def fetch_feed(feed_url):
         if hasattr(entry, "summary") and entry.summary:
             summary = re.sub(r"<[^>]+>", "", entry.summary)
             summary = html.unescape(summary)
-            summary = summary[:1500].strip()  # Increased from 500 to 1500 characters
+            summary = summary[:1500].strip()
 
         if not summary:
             continue
         if title and not has_arabic(title):
             continue
+
+        # Extract full article content
+        content = None
+        if link:
+            logger.debug("Extracting content from %s", link)
+            content = extract_article_content(link)
 
         entries.append(
             {
@@ -85,6 +255,7 @@ def fetch_feed(feed_url):
                 "link": link,
                 "published": published,
                 "summary": summary,
+                "content": content,
             }
         )
 
