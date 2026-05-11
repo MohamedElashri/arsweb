@@ -6,6 +6,10 @@ on:
   push:
     paths:
       - "sources.txt"
+      - "scripts/*.py"
+      - "templates/*.html"
+      - "static/**"
+      - "requirements.txt"
     branches:
       - main
   workflow_dispatch:  # Manual trigger
@@ -14,6 +18,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: "pages"
@@ -74,15 +79,50 @@ jobs:
               raise FileNotFoundError('sources.txt not found')
           "
 
+      - name: Download previous feed cache
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: feed-cache
+          workflow: update.yml
+          branch: main
+          if_no_artifact_found: warn
+          path: .
+
       - name: Fetch feeds
+        timeout-minutes: 20
         run: |
-          make fetch || {
-            echo "⚠️ Feed fetching encountered errors, but continuing with available data"
-            if [ ! -f "feed_cache.json" ]; then
-              echo "❌ No feed cache available, cannot proceed"
-              exit 1
+          # Save previous cache as fallback
+          if [ -f "feed_cache.json" ]; then
+            cp feed_cache.json feed_cache.json.prev
+            echo "📦 Previous cache restored ($(wc -c < feed_cache.json) bytes)"
+          fi
+          
+          # Run fetch with error handling
+          if make fetch; then
+            echo "✅ Feeds fetched successfully"
+          else
+            echo "⚠️ Feed fetching encountered errors"
+            if [ -f "feed_cache.json.prev" ]; then
+              mv feed_cache.json.prev feed_cache.json
+              echo "📦 Restored previous cache"
             fi
-          }
+          fi
+          
+          # Ensure cache exists
+          if [ ! -f "feed_cache.json" ]; then
+            echo "❌ No feed cache available, cannot proceed"
+            exit 1
+          fi
+          
+          echo "📦 Cache size: $(wc -c < feed_cache.json) bytes"
+          python3 -c "
+          import json
+          with open('feed_cache.json') as f:
+              cache = json.load(f)
+          total = sum(len(s['entries']) for s in cache['sites'])
+          has_content = sum(1 for s in cache['sites'] for e in s['entries'] if e.get('content'))
+          print(f'📄 Posts: {total} | Content extracted: {has_content}/{total} ({has_content/total*100:.0f}%)')
+          "
 
       - name: Generate site
         run: make build
@@ -112,6 +152,14 @@ jobs:
           
           echo "✅ Site generated successfully"
           ls -la public/
+
+      - name: Upload feed cache artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: feed-cache
+          path: feed_cache.json
+          retention-days: 7
+          overwrite: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
