@@ -10,7 +10,7 @@ from pathlib import Path
 
 import feedparser
 import requests
-from bs4 import BeautifulSoup
+import trafilatura
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,71 +25,9 @@ MAX_POSTS_PER_SITE = 10
 MAX_POSTS_TOTAL = 800
 REQUEST_TIMEOUT = 12
 CONTENT_TIMEOUT = 15
-MAX_CONTENT_LENGTH = 30000  # characters
+MAX_CONTENT_LENGTH = 40000  # characters
 
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
-
-# Tags to remove entirely
-REMOVE_TAGS = {
-    "script", "style", "nav", "header", "footer", "aside", "form",
-    "iframe", "noscript", "svg", "canvas", "audio", "video", "embed",
-    "object", "template", "button", "input", "textarea", "select",
-    "label", "dialog", "menu", "address", "fieldset", "legend",
-    "optgroup", "option", "datalist", "output", "progress", "meter",
-    "details", "summary", "marquee", "blink", "map", "area",
-    "source", "track", "picture", "del", "ins", "wbr",
-}
-
-# Tags to keep (all others are removed but their text is preserved)
-KEEP_TAGS = {
-    "p", "h1", "h2", "h3", "h4", "h5", "h6",
-    "a", "strong", "b", "em", "i", "blockquote", "q",
-    "ul", "ol", "li", "br", "hr", "img", "figure", "figcaption",
-    "table", "thead", "tbody", "tr", "td", "th", "pre", "code",
-    "div", "span", "article", "main", "section", "dl", "dt", "dd",
-    "sup", "sub", "small", "mark", "s", "u", "abbr", "cite", "dfn",
-    "kbd", "samp", "time", "var", "ruby", "rt", "rp",
-}
-
-# Attributes allowed per tag
-ALLOWED_ATTRS = {
-    "a": {"href", "title"},
-    "img": {"src", "alt", "title", "loading"},
-    "blockquote": {"cite"},
-    "q": {"cite"},
-    "abbr": {"title"},
-    "time": {"datetime"},
-    "td": {"colspan", "rowspan"},
-    "th": {"colspan", "rowspan"},
-}
-
-# CSS selectors to find main content (ordered by preference)
-CONTENT_SELECTORS = [
-    "article",
-    "main",
-    '[role="main"]',
-    ".entry-content",
-    ".post-content",
-    ".content",
-    "#content",
-    ".entry",
-    ".post",
-    ".single-post",
-    ".post__content",
-    ".article-content",
-    ".article-body",
-    ".entry-body",
-    ".post-body",
-    ".story-content",
-    ".page-content",
-    ".main-content",
-    ".site-content",
-    ".blog-post",
-    ".post-entry",
-    ".entry-post",
-    ".postarticle",
-    ".post Article",
-]
 
 
 def has_arabic(text):
@@ -114,8 +52,60 @@ def clean_url(url):
     return None
 
 
+def sanitize_html(html_str, source_url):
+    """Clean and sanitize trafilatura output HTML."""
+    if not html_str or len(html_str) < 200:
+        return None
+
+    # Strip trafilatura's <html><body> wrapper
+    html_str = re.sub(r"^\s*<html>\s*<body>\s*", "", html_str, flags=re.IGNORECASE)
+    html_str = re.sub(r"\s*</body>\s*</html>\s*$", "", html_str, flags=re.IGNORECASE)
+    html_str = html_str.strip()
+
+    # Trafilatura already strips scripts/styles/nav/etc.
+    # We just need to validate URLs and truncate.
+    def clean_attr(match):
+        attr = match.group(1)
+        val = match.group(2)
+        if attr in ("href", "src"):
+            cleaned = clean_url(val)
+            if cleaned:
+                return f'{attr}="{cleaned}"'
+            return ''
+        return match.group(0)
+
+    # Convert trafilatura <graphic> to browser-friendly <img>
+    html_str = re.sub(
+        r'<graphic\s+src="([^"]*)"\s*/?>',
+        r'<img src="\1" loading="lazy" alt="" />',
+        html_str,
+    )
+
+    # Clean href/src attributes
+    html_str = re.sub(r'(href|src)="([^"]*)"', clean_attr, html_str)
+    html_str = re.sub(r"(href|src)='([^']*)'", clean_attr, html_str)
+
+    # Collapse excessive whitespace
+    html_str = re.sub(r"\n\s*\n", "\n\n", html_str)
+    html_str = html_str.strip()
+
+    # Truncate if too long (try to end at a paragraph boundary)
+    if len(html_str) > MAX_CONTENT_LENGTH:
+        cutoff = html_str[:MAX_CONTENT_LENGTH]
+        last_p = cutoff.rfind("</p>")
+        if last_p > MAX_CONTENT_LENGTH * 0.7:
+            html_str = cutoff[:last_p + 4]
+        else:
+            html_str = cutoff
+
+    if len(html_str) < 200:
+        return None
+
+    return html_str
+
+
 def extract_article_content(url):
-    """Fetch article HTML and extract clean content."""
+    """Fetch article HTML and extract clean content using trafilatura."""
     try:
         resp = requests.get(
             url,
@@ -136,71 +126,20 @@ def extract_article_content(url):
         return None
 
     try:
-        soup = BeautifulSoup(resp.text, "html.parser")
+        result = trafilatura.extract(
+            resp.text,
+            include_comments=False,
+            include_tables=False,
+            include_images=True,
+            include_links=True,
+            url=url,
+            output_format="html",
+        )
     except Exception as e:
-        logger.debug("Failed to parse HTML for %s: %s", url, e)
+        logger.debug("Trafilatura failed for %s: %s", url, e)
         return None
 
-    # Remove unwanted tags entirely
-    for tag in soup.find_all(REMOVE_TAGS):
-        tag.decompose()
-
-    # Find main content container
-    main_content = None
-    for selector in CONTENT_SELECTORS:
-        try:
-            main_content = soup.select_one(selector)
-        except Exception:
-            continue
-        if main_content:
-            break
-
-    if not main_content:
-        main_content = soup.find("body") or soup
-
-    # Sanitize: remove disallowed tags but keep their text
-    for tag in list(main_content.find_all()):
-        if tag.name not in KEEP_TAGS:
-            tag.unwrap()
-            continue
-
-        # Sanitize attributes: strip classes/ids to avoid CSS conflicts,
-        # keep only allowed attributes
-        allowed = ALLOWED_ATTRS.get(tag.name, set())
-        for attr in list(tag.attrs.keys()):
-            if attr not in allowed:
-                del tag[attr]
-                continue
-            # Validate href/src URLs
-            if attr in ("href", "src"):
-                cleaned = clean_url(tag[attr])
-                if cleaned:
-                    tag[attr] = cleaned
-                else:
-                    del tag[attr]
-
-    # Get HTML string
-    html_str = str(main_content)
-
-    # Remove empty tags recursively
-    prev = None
-    while prev != html_str:
-        prev = html_str
-        html_str = re.sub(r"<([a-zA-Z0-9]+)[^>]*>\s*</\1>", "", html_str)
-        html_str = re.sub(r"<([a-zA-Z0-9]+)[^>]*>\s*</\1>", "", html_str)
-
-    # Collapse excessive whitespace
-    html_str = re.sub(r"\n\s*\n", "\n\n", html_str)
-    html_str = html_str.strip()
-
-    # Truncate if too long
-    if len(html_str) > MAX_CONTENT_LENGTH:
-        html_str = html_str[:MAX_CONTENT_LENGTH].rsplit("</p>", 1)[0] + "</p>"
-
-    if len(html_str) < 200:
-        return None
-
-    return html_str
+    return sanitize_html(result, url)
 
 
 def fetch_feed(feed_url):
