@@ -68,10 +68,26 @@
     return;
   }
 
-  for (let i = posts.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [posts[i], posts[j]] = [posts[j], posts[i]];
-  }
+  // Recency-biased shuffle: heavily prefers newer posts
+  // Posts are already sorted by discovery_score (newest first) from Python.
+  // We pick from a small window at the top of the remaining pool,
+  // and gradually widen that window as we deplete the newest posts.
+  (function recencyBiasedShuffle() {
+    const pool = posts.slice(); // copy — already sorted by score
+    const total = pool.length;
+    const shuffled = [];
+
+    while (pool.length > 0) {
+      // Window starts at ~10% of remaining and grows to ~45%
+      const progress = 1 - (pool.length / total);
+      const windowFraction = 0.10 + (0.35 * progress);
+      const windowSize = Math.max(1, Math.ceil(pool.length * windowFraction));
+      const idx = Math.floor(Math.random() * windowSize);
+      shuffled.push(pool.splice(idx, 1)[0]);
+    }
+
+    posts = shuffled;
+  })();
 
   let currentIndex = 0;
   const nodes = {

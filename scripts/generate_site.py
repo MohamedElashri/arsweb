@@ -244,9 +244,6 @@ def apply_discovery_algorithm(all_posts):
             final_current_year.append(post)
             site_daily_count[site_name] += 1
 
-    # Shuffle current year posts for randomness
-    random.shuffle(final_current_year)
-    
     # Mark current year posts as recent
     for post in final_current_year:
         post["is_discovery"] = False
@@ -274,10 +271,7 @@ def apply_discovery_algorithm(all_posts):
         for post in older_filtered:
             post["is_discovery"] = True
         
-        # Shuffle older posts
-        random.shuffle(older_filtered)
-        
-        # Add to final list
+        # Add to final list (keeps score-based ordering: newer first)
         final_posts.extend(older_filtered)
 
     return final_posts
