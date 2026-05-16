@@ -170,7 +170,6 @@ def extract_article_content(url):
             include_formatting=True,
             include_links=True,
             favor_recall=True,
-            target_language="ar",
             url=resp.url or url,
             output_format="html",
         )
