@@ -1,0 +1,97 @@
+name: Remove broken feeds
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"  # Weekly on Monday at 7:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  detect-and-prune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install deps
+        run: |
+          uv venv .venv
+          source .venv/bin/activate
+          uv pip install -r requirements.txt
+
+      - name: Detect and remove broken feeds
+        run: |
+          source .venv/bin/activate
+          python scripts/validate_feeds.py \
+            --no-age-check \
+            --remove-failed \
+            --report broken-feeds-report.json
+
+      - name: Prepare PR body
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("broken-feeds-report.json").read_text(encoding="utf-8"))
+          failed = [item for item in report["results"] if not item["ok"]]
+
+          lines = [
+              "This automated PR removes RSS feeds that failed validation.",
+              "",
+              "Validation skips recency checks here, so this only targets feeds that are unreachable, unparseable, or empty.",
+              "",
+              f"Failed feeds detected: {len(failed)}",
+          ]
+
+          if failed:
+              lines.append("")
+              for item in failed:
+                  details = item["details"] or item["reason"]
+                  lines.append(f"- `{item['url']}`: {details}")
+
+          Path("broken-feeds-pr.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Open removal PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- sources.txt; then
+            echo "No broken feeds were removed."
+            exit 0
+          fi
+
+          branch="automated/remove-broken-feeds"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add sources.txt
+          git commit -m "Remove broken RSS feeds"
+          git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch" || true
+          git push --force-with-lease origin "$branch"
+
+          existing_pr="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing_pr" ]; then
+            gh pr edit "$existing_pr" --title "Remove broken RSS feeds" --body-file broken-feeds-pr.md
+            echo "Updated PR #$existing_pr"
+          else
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --title "Remove broken RSS feeds" \
+              --body-file broken-feeds-pr.md
+          fi

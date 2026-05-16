@@ -422,6 +422,9 @@ a:hover {
   font-size: 1.1rem;
   line-height: 1.95;
   text-align: start;
+  direction: rtl;
+  unicode-bidi: plaintext;
+  overflow-wrap: anywhere;
 }
 
 .reader-view > *:first-child { margin-top: 0; }
@@ -437,6 +440,7 @@ a:hover {
 .reader-view p {
   margin-top: 0;
   margin-bottom: 1.4rem;
+  unicode-bidi: plaintext;
 }
 
 .reader-view a {
@@ -480,6 +484,12 @@ a:hover {
 }
 
 .reader-view li { margin-bottom: 0.5rem; }
+
+.reader-view li,
+.reader-view blockquote,
+.reader-view figcaption {
+  unicode-bidi: plaintext;
+}
 
 .reader-view pre {
   background: var(--surface);

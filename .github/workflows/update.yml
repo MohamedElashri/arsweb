@@ -37,7 +37,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v6
 
       - name: Cache Python dependencies
         uses: actions/cache@v4
@@ -121,7 +121,9 @@ jobs:
               cache = json.load(f)
           total = sum(len(s['entries']) for s in cache['sites'])
           has_content = sum(1 for s in cache['sites'] for e in s['entries'] if e.get('content'))
-          print(f'📄 Posts: {total} | Content extracted: {has_content}/{total} ({has_content/total*100:.0f}%)')
+          failed = len(cache.get('failed_feeds', []))
+          pct = (has_content / total * 100) if total else 0
+          print(f'📄 Posts: {total} | Content extracted: {has_content}/{total} ({pct:.0f}%) | Failed feeds skipped: {failed}')
           "
 
       - name: Generate site
@@ -130,8 +132,7 @@ jobs:
       - name: Quick feed validation
         run: |
           source .venv/bin/activate
-          uv pip install requests
-          python scripts/validate_feeds.py --max-feeds 3 --no-age-check
+          python scripts/validate_feeds.py --max-feeds 3 --no-age-check --soft-fail --report quick-feed-validation.json
 
       - name: Show feed statistics
         run: |

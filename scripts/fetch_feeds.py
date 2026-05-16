@@ -5,8 +5,10 @@ import html
 import json
 import logging
 import re
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urljoin
 
 import feedparser
 import requests
@@ -42,11 +44,43 @@ def load_sources():
     return urls
 
 
-def clean_url(url):
+def normalize_text(text):
+    """Normalize text decoded from Arabic pages and fix common mojibake."""
+    if not text:
+        return ""
+
+    if not has_arabic(text) and any(marker in text for marker in ("Ø", "Ù", "Ú", "Ã")):
+        try:
+            fixed = text.encode("latin1").decode("utf-8")
+            if has_arabic(fixed):
+                text = fixed
+        except UnicodeError:
+            pass
+
+    text = unicodedata.normalize("NFC", text)
+    text = text.replace("\ufeff", "").replace("\xa0", " ")
+    text = re.sub(r"[\u202a-\u202e\u2066-\u2069]", "", text)
+    text = re.sub(r"[ \t\r\f\v]+", " ", text)
+    return text.strip()
+
+
+def decode_response(resp):
+    """Decode a response with a better default for Arabic sites."""
+    encoding = resp.encoding
+    if not encoding or encoding.lower() in {"iso-8859-1", "ascii"}:
+        encoding = resp.apparent_encoding
+    if encoding:
+        resp.encoding = encoding
+    return normalize_text(resp.text)
+
+
+def clean_url(url, base_url=None):
     """Only allow http/https/mailto URLs."""
     if not url:
         return None
     url = url.strip()
+    if base_url:
+        url = urljoin(base_url, url)
     if url.startswith("http://") or url.startswith("https://") or url.startswith("mailto:"):
         return url
     return None
@@ -54,6 +88,7 @@ def clean_url(url):
 
 def sanitize_html(html_str, source_url):
     """Clean and sanitize trafilatura output HTML."""
+    html_str = normalize_text(html_str)
     if not html_str or len(html_str) < 200:
         return None
 
@@ -68,9 +103,9 @@ def sanitize_html(html_str, source_url):
         attr = match.group(1)
         val = match.group(2)
         if attr in ("href", "src"):
-            cleaned = clean_url(val)
+            cleaned = clean_url(html.unescape(val), source_url)
             if cleaned:
-                return f'{attr}="{cleaned}"'
+                return f'{attr}="{html.escape(cleaned, quote=True)}"'
             return ''
         return match.group(0)
 
@@ -85,7 +120,7 @@ def sanitize_html(html_str, source_url):
     html_str = re.sub(r'(href|src)="([^"]*)"', clean_attr, html_str)
     html_str = re.sub(r"(href|src)='([^']*)'", clean_attr, html_str)
 
-    # Collapse excessive whitespace
+    # Collapse excessive whitespace without disturbing paragraph boundaries.
     html_str = re.sub(r"\n\s*\n", "\n\n", html_str)
     html_str = html_str.strip()
 
@@ -126,27 +161,41 @@ def extract_article_content(url):
         return None
 
     try:
+        page_html = decode_response(resp)
         result = trafilatura.extract(
-            resp.text,
+            page_html,
             include_comments=False,
             include_tables=False,
             include_images=True,
+            include_formatting=True,
             include_links=True,
-            url=url,
+            favor_recall=True,
+            target_language="ar",
+            url=resp.url or url,
             output_format="html",
         )
     except Exception as e:
         logger.debug("Trafilatura failed for %s: %s", url, e)
         return None
 
-    return sanitize_html(result, url)
+    return sanitize_html(result, resp.url or url)
 
 
 def fetch_feed(feed_url):
     """Fetch a single RSS feed and return parsed entries."""
     logger.info("Fetching %s ...", feed_url)
     try:
-        feed = feedparser.parse(feed_url)
+        resp = requests.get(
+            feed_url,
+            timeout=REQUEST_TIMEOUT,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; ArabicSmallWeb/1.0)",
+                "Accept": "application/rss+xml,application/atom+xml,application/xml,text/xml,*/*;q=0.8",
+                "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
+            },
+        )
+        resp.raise_for_status()
+        feed = feedparser.parse(resp.content)
     except Exception as e:
         logger.error("Failed to fetch %s: %s", feed_url, e)
         return None
@@ -170,11 +219,11 @@ def fetch_feed(feed_url):
         if hasattr(entry, "link") and entry.link:
             link = entry.link
 
-        title = html.unescape(entry.get("title", ""))
+        title = normalize_text(html.unescape(entry.get("title", "")))
         summary = ""
         if hasattr(entry, "summary") and entry.summary:
-            summary = re.sub(r"<[^>]+>", "", entry.summary)
-            summary = html.unescape(summary)
+            summary = re.sub(r"<[^>]+>", " ", entry.summary)
+            summary = normalize_text(html.unescape(summary))
             summary = summary[:1500].strip()
 
         if not summary:
@@ -211,9 +260,11 @@ def main():
     sites = load_sources()
     cache = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "sites_count": len(sites),
+        "sources_count": len(sites),
+        "sites_count": 0,
         "posts_count": 0,
         "sites": [],
+        "failed_feeds": [],
     }
 
     total_posts = 0
@@ -221,6 +272,7 @@ def main():
         result = fetch_feed(feed_url)
         if result is None:
             logger.warning("Skipping %s due to errors", feed_url)
+            cache["failed_feeds"].append(feed_url)
             continue
 
         cache["sites"].append(result)
@@ -232,11 +284,19 @@ def main():
             break
 
     cache["posts_count"] = total_posts
+    cache["sites_count"] = len(cache["sites"])
 
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(cache, f, ensure_ascii=False, indent=2)
 
-    logger.info("Cache written to %s (%d sites, %d posts)", CACHE_FILE, cache["sites_count"], cache["posts_count"])
+    logger.info(
+        "Cache written to %s (%d/%d sites, %d posts, %d failed feeds)",
+        CACHE_FILE,
+        cache["sites_count"],
+        cache["sources_count"],
+        cache["posts_count"],
+        len(cache["failed_feeds"]),
+    )
 
 
 if __name__ == "__main__":
