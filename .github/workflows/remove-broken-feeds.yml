@@ -32,13 +32,35 @@ jobs:
           source .venv/bin/activate
           uv pip install -r requirements.txt
 
+      - name: Download previous failure state
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: broken-feeds-state
+          workflow: remove-broken-feeds.yml
+          branch: main
+          if_no_artifact_found: warn
+          path: .
+
       - name: Detect and remove broken feeds
         run: |
           source .venv/bin/activate
           python scripts/validate_feeds.py \
             --no-age-check \
+            --retries 2 \
+            --failure-state broken-feeds-state.json \
+            --failure-threshold 3 \
             --remove-failed \
             --report broken-feeds-report.json
+
+      - name: Upload failure state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: broken-feeds-state
+          path: broken-feeds-state.json
+          if-no-files-found: ignore
+          retention-days: 30
+          overwrite: true
 
       - name: Prepare PR body
         run: |
@@ -48,20 +70,23 @@ jobs:
 
           report = json.loads(Path("broken-feeds-report.json").read_text(encoding="utf-8"))
           failed = [item for item in report["results"] if not item["ok"]]
+          candidates = [item for item in failed if item.get("remove_candidate")]
 
           lines = [
-              "This automated PR removes RSS feeds that failed validation.",
+              "This automated PR removes RSS feeds that failed validation repeatedly.",
               "",
-              "Validation skips recency checks here, so this only targets feeds that are unreachable, unparseable, or empty.",
+              "Validation skips recency checks here. Feeds are only removed after 3 consecutive failed weekly checks.",
               "",
-              f"Failed feeds detected: {len(failed)}",
+              f"Failed feeds in latest run: {len(failed)}",
+              f"Removal candidates: {len(candidates)}",
           ]
 
-          if failed:
+          if candidates:
               lines.append("")
-              for item in failed:
+              for item in candidates:
                   details = item["details"] or item["reason"]
-                  lines.append(f"- `{item['url']}`: {details}")
+                  count = item.get("consecutive_failures", 0)
+                  lines.append(f"- `{item['url']}`: {details} ({count} consecutive failures)")
 
           Path("broken-feeds-pr.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY

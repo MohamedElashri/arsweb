@@ -48,5 +48,4 @@ https://tariqk.me/feed/
 https://fariszr.com/index.xml
 https://abotyim.github.io/ar/index.xml
 https://eltabarani.com/rss.xml
-https://iwatheq.com/feed.xml
-https://ar.melashri.net/index.xml
+https://ar.melashri.net/rss.xml

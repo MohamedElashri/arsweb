@@ -369,6 +369,18 @@ a:hover {
   transform: translateY(-1px);
 }
 
+.nav-btn-secondary {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.nav-btn-secondary:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .nav-btn:disabled {
   background: var(--text-muted);
   cursor: not-allowed;
@@ -604,6 +616,10 @@ a:hover {
   }
 
   .nav-btn {
+    order: 2;
+  }
+
+  .nav-btn-secondary {
     order: 2;
   }
 

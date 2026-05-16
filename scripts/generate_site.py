@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Generate static HTML site from feed_cache.json."""
 
+import hashlib
 import json
 import math
 import random
 import shutil
 from collections import defaultdict
 from datetime import datetime, timezone
-from email.utils import parsedate_tz
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -103,55 +104,58 @@ def remove_em_dashes(text):
     return text.strip()
 
 
+def post_id(post):
+    """Create a stable short id for client-side permalinks."""
+    basis = "|".join(
+        [
+            post.get("link", ""),
+            post.get("title", ""),
+            post.get("published", ""),
+            post.get("site_name", ""),
+        ]
+    )
+    return hashlib.sha1(basis.encode("utf-8")).hexdigest()[:12]
+
+
 def parse_date_ts(date_str):
+    parsed = parse_post_datetime(date_str)
+    if parsed:
+        return int(parsed.timestamp())
+    return 0
+
+
+def parse_post_datetime(date_str):
+    """Parse common RSS/Atom date formats into an aware UTC datetime."""
+    if not date_str:
+        return None
+
     try:
-        tt = parsedate_tz(date_str)
-        if tt:
-            from calendar import timegm
-            return timegm(tt)
+        parsed = parsedate_to_datetime(date_str)
+        if parsed:
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
     except Exception:
         pass
-    return 0
+
+    try:
+        parsed = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except Exception:
+        pass
+
+    return None
 
 
 def calculate_post_score(post, site_stats, now_ts, config):
     """Calculate discovery score for a post using hybrid algorithm."""
     
-    # Time decay factor (newer posts get higher base score)
-    post_ts = parse_date_ts(post.get("published", ""))
-    # Don't fallback to current time - let strict parsing handle it
-    
-    # Get current year and post year for absolute preference
-    from datetime import datetime
+    post_date = parse_post_datetime(post.get("published", ""))
+    post_ts = int(post_date.timestamp()) if post_date else 0
     current_year = datetime.now().year
-    
-    # More robust date parsing - be strict
-    post_year = None
-    try:
-        if post_ts > 0:
-            post_date = datetime.fromtimestamp(post_ts)
-            post_year = post_date.year
-        else:
-            # Try to parse the original date string directly
-            date_str = post.get("published", "")
-            if date_str:
-                # Try ISO format first
-                if 'T' in date_str:
-                    try:
-                        post_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                        post_year = post_date.year
-                    except:
-                        pass
-                else:
-                    # Try email format
-                    from email.utils import parsedate_tz
-                    import time
-                    parsed = parsedate_tz(date_str)
-                    if parsed:
-                        post_date = datetime.fromtimestamp(time.mktime(parsed[:9]))
-                        post_year = post_date.year
-    except Exception as e:
-        pass
+    post_year = post_date.year if post_date else None
     
     # If we can't parse the date, exclude the post
     if post_year is None:
@@ -213,15 +217,8 @@ def apply_discovery_algorithm(all_posts):
     older_posts = []
     
     for post in scored_posts:
-        # Parse post year - be strict about parsing
-        post_year = None
-        try:
-            post_ts = parse_date_ts(post.get("published", ""))
-            if post_ts > 0:
-                post_date = datetime.fromtimestamp(post_ts)
-                post_year = post_date.year
-        except:
-            pass
+        post_date = parse_post_datetime(post.get("published", ""))
+        post_year = post_date.year if post_date else None
         
         # Only include posts with valid, parseable dates
         if post_year == current_year:
@@ -338,6 +335,7 @@ def get_all_posts(cache):
     # Add Arabic dates
     for post in all_posts:
         post["date_ar"] = to_arabic_date(post.get("published", ""))
+        post["id"] = post_id(post)
     
     # Apply discovery algorithm
     discovery_posts = apply_discovery_algorithm(all_posts)

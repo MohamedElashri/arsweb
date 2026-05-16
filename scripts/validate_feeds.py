@@ -4,6 +4,7 @@
 import argparse
 import json
 import sys
+import time
 from calendar import timegm
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -23,6 +24,9 @@ class FeedValidationResult:
     ok: bool
     reason: str
     details: str = ""
+    temporary: bool = False
+    consecutive_failures: int = 0
+    remove_candidate: bool = False
     status_code: int | None = None
     entries: int = 0
     title: str = ""
@@ -47,6 +51,11 @@ def parse_entry_date(entry):
     return None
 
 
+def is_temporary_http_failure(status_code):
+    """Classify status codes that are likely to recover without source removal."""
+    return status_code in {408, 425, 429} or 500 <= status_code <= 599
+
+
 def print_result(result):
     """Print a human-readable validation result."""
     print(f"🔍 Validating: {result.url}")
@@ -66,10 +75,11 @@ def print_result(result):
             print("  ✅ Feed validation passed")
         return
 
-    print(f"  ❌ {result.reason}: {result.details}")
+    temporary = "temporary " if result.temporary else ""
+    print(f"  ❌ {temporary}{result.reason}: {result.details}")
 
 
-def validate_feed(url, check_age=True, timeout=30, verbose=True):
+def validate_feed_once(url, check_age=True, timeout=30):
     """Validate a single RSS feed."""
     result = FeedValidationResult(url=url, ok=False, reason="unknown")
 
@@ -84,11 +94,16 @@ def validate_feed(url, check_age=True, timeout=30, verbose=True):
         )
         response.raise_for_status()
         result.status_code = response.status_code
-    except Exception as e:
+    except requests.HTTPError as e:
+        result.status_code = e.response.status_code if e.response is not None else None
         result.reason = "http_error"
         result.details = str(e)
-        if verbose:
-            print_result(result)
+        result.temporary = bool(result.status_code and is_temporary_http_failure(result.status_code))
+        return result
+    except requests.RequestException as e:
+        result.reason = "http_error"
+        result.details = str(e)
+        result.temporary = True
         return result
 
     try:
@@ -96,8 +111,6 @@ def validate_feed(url, check_age=True, timeout=30, verbose=True):
     except Exception as e:
         result.reason = "parse_error"
         result.details = str(e)
-        if verbose:
-            print_result(result)
         return result
 
     result.entries = len(feed.entries)
@@ -106,15 +119,11 @@ def validate_feed(url, check_age=True, timeout=30, verbose=True):
     if feed.bozo and not feed.entries:
         result.reason = "parse_error"
         result.details = str(feed.bozo_exception)
-        if verbose:
-            print_result(result)
         return result
 
     if not feed.entries:
         result.reason = "empty_feed"
         result.details = "No entries found in feed"
-        if verbose:
-            print_result(result)
         return result
 
     if check_age:
@@ -127,8 +136,6 @@ def validate_feed(url, check_age=True, timeout=30, verbose=True):
             if entry_date < two_years_ago:
                 result.reason = "stale_feed"
                 result.details = f"Latest post is older than 2 years: {result.latest_date}"
-                if verbose:
-                    print_result(result)
                 return result
         else:
             result.details = "Could not parse entry date, but feed is accessible"
@@ -138,9 +145,74 @@ def validate_feed(url, check_age=True, timeout=30, verbose=True):
 
     result.ok = True
     result.reason = "ok"
+    return result
+
+
+def validate_feed(url, check_age=True, timeout=30, verbose=True, retries=1, retry_delay=2):
+    """Validate a single RSS feed with retry for temporary failures."""
+    result = None
+    attempts = max(1, retries + 1)
+    for attempt in range(1, attempts + 1):
+        result = validate_feed_once(url, check_age, timeout)
+        if result.ok or not result.temporary or attempt == attempts:
+            break
+        time.sleep(retry_delay)
+
     if verbose:
         print_result(result)
     return result
+
+
+def load_failure_state(path):
+    """Load previous feed validation state."""
+    if not path or not Path(path).exists():
+        return {"feeds": {}}
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return {"feeds": {}}
+
+
+def update_failure_state(results, state, threshold):
+    """Update consecutive failure counts and mark removal candidates."""
+    feeds = state.setdefault("feeds", {})
+    now = datetime.now(timezone.utc).isoformat()
+    active_urls = {result.url for result in results}
+
+    for url in list(feeds):
+        if url not in active_urls:
+            feeds.pop(url, None)
+
+    for result in results:
+        feed_state = feeds.setdefault(result.url, {})
+        if result.ok:
+            feed_state["consecutive_failures"] = 0
+            feed_state["last_reason"] = "ok"
+            result.consecutive_failures = 0
+            result.remove_candidate = False
+            continue
+
+        consecutive_failures = int(feed_state.get("consecutive_failures", 0)) + 1
+        feed_state.update(
+            {
+                "consecutive_failures": consecutive_failures,
+                "last_reason": result.reason,
+                "last_details": result.details,
+                "temporary": result.temporary,
+                "last_failed_at": now,
+            }
+        )
+        result.consecutive_failures = consecutive_failures
+        result.remove_candidate = consecutive_failures >= threshold
+
+    state["updated_at"] = now
+    return state
+
+
+def save_failure_state(path, state):
+    """Persist feed validation state."""
+    if path:
+        Path(path).write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def write_report(path, results):
@@ -149,6 +221,7 @@ def write_report(path, results):
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "total": len(results),
         "failed": sum(1 for result in results if not result.ok),
+        "remove_candidates": sum(1 for result in results if result.remove_candidate),
         "results": [asdict(result) for result in results],
     }
     Path(path).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -195,7 +268,10 @@ def main():
     parser.add_argument("--no-age-check", action="store_true", help="Skip age validation")
     parser.add_argument("--max-feeds", type=int, help="Maximum number of feeds to validate")
     parser.add_argument("--timeout", type=int, default=30, help="Request timeout in seconds")
+    parser.add_argument("--retries", type=int, default=1, help="Retry count for temporary failures")
     parser.add_argument("--report", help="Write JSON validation report to this path")
+    parser.add_argument("--failure-state", help="Read/write JSON state for consecutive failures")
+    parser.add_argument("--failure-threshold", type=int, default=1, help="Consecutive failures before removal")
     parser.add_argument("--remove-failed", action="store_true", help="Remove failed URLs from the source file")
     parser.add_argument("--soft-fail", action="store_true", help="Report failures but exit successfully")
 
@@ -205,7 +281,10 @@ def main():
     if args.url:
         print("📋 Validating single feed...")
         print("=" * 60)
-        result = validate_feed(args.url, check_age, args.timeout)
+        result = validate_feed(args.url, check_age, args.timeout, retries=args.retries)
+        state = load_failure_state(args.failure_state)
+        update_failure_state([result], state, args.failure_threshold)
+        save_failure_state(args.failure_state, state)
         print("=" * 60)
         if args.report:
             write_report(args.report, [result])
@@ -230,8 +309,12 @@ def main():
     results = []
     for i, url in enumerate(urls, 1):
         print(f"[{i}/{len(urls)}]")
-        results.append(validate_feed(url, check_age, args.timeout))
+        results.append(validate_feed(url, check_age, args.timeout, retries=args.retries))
         print()
+
+    state = load_failure_state(args.failure_state)
+    update_failure_state(results, state, args.failure_threshold)
+    save_failure_state(args.failure_state, state)
 
     failed = summarize(results)
 
@@ -240,8 +323,12 @@ def main():
         print(f"🧾 Wrote report to {args.report}")
 
     if args.remove_failed and failed:
-        removed = remove_failed_feeds(sources_file, [result.url for result in failed])
-        print(f"🧹 Removed {len(removed)} failed feed(s) from {args.file}")
+        candidates = [result.url for result in failed if result.remove_candidate]
+        removed = remove_failed_feeds(sources_file, candidates)
+        print(
+            f"🧹 Removed {len(removed)} feed(s) with at least "
+            f"{args.failure_threshold} consecutive failure(s) from {args.file}"
+        )
 
     if failed and not (args.soft_fail or args.remove_failed):
         sys.exit(1)

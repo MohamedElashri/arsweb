@@ -11,6 +11,11 @@
 
 <section class="viewer">
   <div class="viewer-bar">
+    <button class="nav-btn nav-btn-secondary" id="prev-btn" type="button" title="المنشور السابق">
+      <span class="nav-icon">→</span>
+      <span>السابق</span>
+    </button>
+
     <button class="nav-btn" id="next-btn" type="button" title="منشور عشوائي آخر (مفتاح المسافة)">
       <span class="nav-icon">←</span>
       <span>التالي</span>
@@ -52,8 +57,9 @@
 (function() {
   const data = document.getElementById('posts-data');
   const nextButton = document.getElementById('next-btn');
+  const prevButton = document.getElementById('prev-btn');
 
-  if (!data || !nextButton) return;
+  if (!data || !nextButton || !prevButton) return;
 
   let posts = [];
   try {
@@ -109,10 +115,29 @@
     }
   }
 
+  function getLinkedPostIndex() {
+    const hash = window.location.hash.replace(/^#/, '');
+    const params = new URLSearchParams(hash);
+    const id = params.get('post');
+    if (!id) return -1;
+    return posts.findIndex(function(post) {
+      return post.id === id;
+    });
+  }
+
+  function updatePermalink(post) {
+    if (!post || !post.id) return;
+    const nextHash = '#post=' + encodeURIComponent(post.id);
+    if (window.location.hash !== nextHash) {
+      history.replaceState(null, '', nextHash);
+    }
+  }
+
   function showPost(index) {
     const post = posts[index];
     if (!post) return;
     currentIndex = index;
+    updatePermalink(post);
 
     nodes.title.textContent = post.title || 'منشور بدون عنوان';
     if (nodes.site) nodes.site.textContent = post.site_name || 'موقع مستقل';
@@ -129,37 +154,55 @@
       nodes.contentArea.innerHTML = '<div class="reader-view">' + post.content + '</div>';
     } else {
       const summary = (post.summary || '').slice(0, 800).trim() + ((post.summary || '').length > 800 ? '…' : '');
-      nodes.contentArea.innerHTML =
-        '<div class="reader-fallback">' +
-        '<p class="fallback-text">لم نتمكن من استخراج محتوى المقال.</p>' +
-        '<p class="fallback-summary">' + escapeHtml(summary) + '</p>' +
-        '<a href="' + (post.link || '') + '" target="_blank" rel="noopener" class="read-more-btn">قراءة المقال في الموقع الأصلي ↗</a>' +
-        '</div>';
+      const fallback = document.createElement('div');
+      fallback.className = 'reader-fallback';
+
+      const label = document.createElement('p');
+      label.className = 'fallback-text';
+      label.textContent = 'لم نتمكن من استخراج محتوى المقال.';
+
+      const summaryNode = document.createElement('p');
+      summaryNode.className = 'fallback-summary';
+      summaryNode.textContent = summary;
+
+      const original = document.createElement('a');
+      original.className = 'read-more-btn';
+      original.target = '_blank';
+      original.rel = 'noopener';
+      original.textContent = 'قراءة المقال في الموقع الأصلي ↗';
+      setHref(original, post.link);
+
+      fallback.append(label, summaryNode, original);
+      nodes.contentArea.replaceChildren(fallback);
     }
 
     nodes.contentArea.scrollTop = 0;
-  }
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 
   function nextPost() {
     showPost((currentIndex + 1) % posts.length);
   }
 
+  function previousPost() {
+    showPost((currentIndex - 1 + posts.length) % posts.length);
+  }
+
   nextButton.addEventListener('click', nextPost);
+  prevButton.addEventListener('click', previousPost);
 
   document.addEventListener('keydown', function(event) {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') {
       event.preventDefault();
-      nextPost();
+      if (event.key === 'ArrowRight') {
+        previousPost();
+      } else {
+        nextPost();
+      }
     }
   });
 
-  showPost(0);
+  const linkedIndex = getLinkedPostIndex();
+  showPost(linkedIndex >= 0 ? linkedIndex : 0);
 })();
 </script>
 

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Fetch and aggregate RSS feeds from sources.json."""
+"""Fetch and aggregate RSS feeds from sources.txt."""
 
 import html
 import json
 import logging
 import re
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import feedparser
 import requests
@@ -28,8 +30,22 @@ MAX_POSTS_TOTAL = 800
 REQUEST_TIMEOUT = 12
 CONTENT_TIMEOUT = 15
 MAX_CONTENT_LENGTH = 40000  # characters
+CONTENT_WORKERS = 4
 
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
+ALLOWED_TAGS = {
+    "a", "blockquote", "br", "code", "em", "figcaption", "figure", "h1", "h2", "h3",
+    "h4", "h5", "h6", "hr", "i", "img", "li", "mark", "ol", "p", "pre", "strong",
+    "table", "tbody", "td", "th", "thead", "tr", "u", "ul",
+}
+VOID_TAGS = {"br", "hr", "img"}
+ALLOWED_ATTRS = {
+    "a": {"href", "title"},
+    "img": {"src", "alt", "title", "loading"},
+    "td": {"colspan", "rowspan"},
+    "th": {"colspan", "rowspan"},
+}
+ALLOWED_SCHEMES = {"http", "https", "mailto"}
 
 
 def has_arabic(text):
@@ -39,8 +55,15 @@ def has_arabic(text):
 
 def load_sources():
     """Load feed URLs from sources.txt (one URL per line)."""
+    seen = set()
+    urls = []
     with open(SOURCES_FILE, encoding="utf-8") as f:
-        urls = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+        for line in f:
+            url = line.strip()
+            if not url or url.startswith("#") or url in seen:
+                continue
+            seen.add(url)
+            urls.append(url)
     return urls
 
 
@@ -81,9 +104,99 @@ def clean_url(url, base_url=None):
     url = url.strip()
     if base_url:
         url = urljoin(base_url, url)
-    if url.startswith("http://") or url.startswith("https://") or url.startswith("mailto:"):
+    parsed = urlparse(url)
+    if parsed.scheme in ALLOWED_SCHEMES:
         return url
     return None
+
+
+class ArticleHTMLSanitizer(HTMLParser):
+    """Small allowlist sanitizer for extracted article HTML."""
+
+    def __init__(self, base_url):
+        super().__init__(convert_charrefs=True)
+        self.base_url = base_url
+        self.parts = []
+        self.open_tags = []
+        self.skip_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if tag in {"script", "style", "iframe", "object", "embed", "form"}:
+            self.skip_depth += 1
+            return
+        if self.skip_depth or tag not in ALLOWED_TAGS:
+            return
+
+        clean_attrs = self.clean_attrs(tag, attrs)
+        if tag == "img" and not any(name == "src" for name, _ in clean_attrs):
+            return
+        attr_text = "".join(
+            f' {name}="{html.escape(value, quote=True)}"'
+            for name, value in clean_attrs
+        )
+        self.parts.append(f"<{tag}{attr_text}>")
+        if tag not in VOID_TAGS:
+            self.open_tags.append(tag)
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in VOID_TAGS:
+            self.handle_endtag(tag)
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if tag in {"script", "style", "iframe", "object", "embed", "form"} and self.skip_depth:
+            self.skip_depth -= 1
+            return
+        if self.skip_depth or tag not in ALLOWED_TAGS or tag in VOID_TAGS:
+            return
+        if tag in self.open_tags:
+            while self.open_tags:
+                open_tag = self.open_tags.pop()
+                self.parts.append(f"</{open_tag}>")
+                if open_tag == tag:
+                    break
+
+    def handle_data(self, data):
+        if not self.skip_depth:
+            self.parts.append(html.escape(data, quote=False))
+
+    def clean_attrs(self, tag, attrs):
+        allowed = ALLOWED_ATTRS.get(tag, set())
+        clean = []
+        for name, value in attrs:
+            name = name.lower()
+            if name not in allowed or value is None:
+                continue
+            if name in {"href", "src"}:
+                value = clean_url(html.unescape(value), self.base_url)
+                if not value:
+                    continue
+            elif name in {"colspan", "rowspan"}:
+                value = value.strip()
+                if not value.isdigit() or not 1 <= int(value) <= 20:
+                    continue
+            else:
+                value = normalize_text(html.unescape(value))[:300]
+            clean.append((name, value))
+
+        if tag == "a" and any(name == "href" for name, _ in clean):
+            clean.append(("target", "_blank"))
+            clean.append(("rel", "noopener noreferrer"))
+        if tag == "img":
+            if not any(name == "src" for name, _ in clean):
+                return []
+            if not any(name == "alt" for name, _ in clean):
+                clean.append(("alt", ""))
+            clean = [(name, value) for name, value in clean if name != "loading"]
+            clean.append(("loading", "lazy"))
+        return clean
+
+    def get_html(self):
+        while self.open_tags:
+            self.parts.append(f"</{self.open_tags.pop()}>")
+        return "".join(self.parts)
 
 
 def sanitize_html(html_str, source_url):
@@ -97,18 +210,6 @@ def sanitize_html(html_str, source_url):
     html_str = re.sub(r"\s*</body>\s*</html>\s*$", "", html_str, flags=re.IGNORECASE)
     html_str = html_str.strip()
 
-    # Trafilatura already strips scripts/styles/nav/etc.
-    # We just need to validate URLs and truncate.
-    def clean_attr(match):
-        attr = match.group(1)
-        val = match.group(2)
-        if attr in ("href", "src"):
-            cleaned = clean_url(html.unescape(val), source_url)
-            if cleaned:
-                return f'{attr}="{html.escape(cleaned, quote=True)}"'
-            return ''
-        return match.group(0)
-
     # Convert trafilatura <graphic> to browser-friendly <img>
     html_str = re.sub(
         r'<graphic\s+src="([^"]*)"\s*/?>',
@@ -116,9 +217,9 @@ def sanitize_html(html_str, source_url):
         html_str,
     )
 
-    # Clean href/src attributes
-    html_str = re.sub(r'(href|src)="([^"]*)"', clean_attr, html_str)
-    html_str = re.sub(r"(href|src)='([^']*)'", clean_attr, html_str)
+    sanitizer = ArticleHTMLSanitizer(source_url)
+    sanitizer.feed(html_str)
+    html_str = sanitizer.get_html()
 
     # Collapse excessive whitespace without disturbing paragraph boundaries.
     html_str = re.sub(r"\n\s*\n", "\n\n", html_str)
@@ -230,21 +331,17 @@ def fetch_feed(feed_url):
         if title and not has_arabic(title):
             continue
 
-        # Extract full article content
-        content = None
-        if link:
-            logger.debug("Extracting content from %s", link)
-            content = extract_article_content(link)
-
         entries.append(
             {
                 "title": title,
                 "link": link,
                 "published": published,
                 "summary": summary,
-                "content": content,
+                "content": None,
             }
         )
+
+    extract_article_contents(entries)
 
     return {
         "name": site_name,
@@ -253,6 +350,29 @@ def fetch_feed(feed_url):
         "entries": entries,
         "error": None,
     }
+
+
+def extract_article_contents(entries):
+    """Fetch article contents for feed entries with bounded concurrency."""
+    link_indexes = [
+        (index, entry["link"])
+        for index, entry in enumerate(entries)
+        if entry.get("link")
+    ]
+    if not link_indexes:
+        return
+
+    with ThreadPoolExecutor(max_workers=CONTENT_WORKERS) as executor:
+        future_to_index = {
+            executor.submit(extract_article_content, link): index
+            for index, link in link_indexes
+        }
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            try:
+                entries[index]["content"] = future.result()
+            except Exception as e:
+                logger.debug("Article extraction failed for %s: %s", entries[index]["link"], e)
 
 
 def main():
