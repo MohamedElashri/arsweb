@@ -10,6 +10,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from jinja2 import Environment, FileSystemLoader
 from xml.sax.saxutils import escape
@@ -115,6 +116,16 @@ def post_id(post):
         ]
     )
     return hashlib.sha1(basis.encode("utf-8")).hexdigest()[:12]
+
+
+def site_domain(url):
+    """Return a readable domain for attribution."""
+    if not url:
+        return ""
+    host = urlparse(url).netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host
 
 
 def parse_date_ts(date_str):
@@ -284,6 +295,7 @@ def get_rss_posts(cache):
                     **entry,
                     "site_name": site["name"],
                     "site_url": site["url"],
+                    "site_domain": site_domain(site["url"] or site["feed"]),
                     "summary": remove_em_dashes(entry.get("summary", "")),
                     "title": remove_em_dashes(entry.get("title", "")),
                 }
@@ -327,6 +339,7 @@ def get_all_posts(cache):
                     **entry,
                     "site_name": site["name"],
                     "site_url": site["url"],
+                    "site_domain": site_domain(site["url"] or site["feed"]),
                     "summary": remove_em_dashes(entry.get("summary", "")),
                     "title": remove_em_dashes(entry.get("title", "")),
                 }

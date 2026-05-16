@@ -8,6 +8,31 @@
 </section>
 {% else %}
 {% set featured = all_posts[0] %}
+{% macro source_credit(post) %}
+<header class="reader-masthead">
+  <div class="reader-kicker">قراءة منسقة من الويب العربي</div>
+  <h1 class="reader-post-title">{{ post.title }}</h1>
+  <div class="reader-source-row">
+    <a class="source-name" href="{{ post.site_url }}" target="_blank" rel="noopener">{{ post.site_name }}</a>
+    {% if post.site_domain %}
+    <span class="source-domain">{{ post.site_domain }}</span>
+    {% endif %}
+    <time class="source-date"{% if not post.date_ar %} hidden{% endif %}>{{ post.date_ar }}</time>
+  </div>
+  <div class="source-actions" aria-label="روابط المصدر">
+    <a class="source-action source-action-primary" href="{{ post.link }}" target="_blank" rel="noopener">قراءة الأصل ↗</a>
+    <a class="source-action" href="{{ post.site_url }}" target="_blank" rel="noopener">زيارة المدونة</a>
+  </div>
+</header>
+{% endmacro %}
+{% macro source_footer(post) %}
+<footer class="source-footer">
+  <span>هذا العرض نسخة قراءة منسقة. النص الأصلي منشور في</span>
+  <a href="{{ post.site_url }}" target="_blank" rel="noopener">{{ post.site_name }}</a>
+  <span>·</span>
+  <a href="{{ post.link }}" target="_blank" rel="noopener">افتح المقال الأصلي</a>
+</footer>
+{% endmacro %}
 
 <section class="viewer">
   <div class="viewer-bar">
@@ -35,17 +60,21 @@
   </div>
 
   <div class="viewer-content" id="content-area">
+    <div class="reader-shell">
+      {{ source_credit(featured) }}
     {% if featured.content %}
-    <div class="reader-view">
-      {{ featured.content | safe }}
-    </div>
+      <div class="reader-view">
+        {{ featured.content | safe }}
+      </div>
     {% else %}
-    <div class="reader-fallback">
-      <p class="fallback-text">لم نتمكن من استخراج محتوى المقال.</p>
-      <p class="fallback-summary">{{ featured.summary | truncate(800, true, "…") }}</p>
-      <a href="{{ featured.link }}" target="_blank" rel="noopener" class="read-more-btn">قراءة المقال في الموقع الأصلي ↗</a>
-    </div>
+      <div class="reader-fallback">
+        <p class="fallback-text">لم نتمكن من استخراج محتوى المقال.</p>
+        <p class="fallback-summary">{{ featured.summary | truncate(800, true, "…") }}</p>
+        <a href="{{ featured.link }}" target="_blank" rel="noopener" class="read-more-btn">قراءة المقال في الموقع الأصلي ↗</a>
+      </div>
     {% endif %}
+      {{ source_footer(featured) }}
+    </div>
   </div>
 </section>
 
@@ -115,6 +144,73 @@
     }
   }
 
+  function createLink(className, text, href) {
+    const link = document.createElement('a');
+    link.className = className;
+    link.textContent = text;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    setHref(link, href);
+    return link;
+  }
+
+  function createSourceCard(post) {
+    const masthead = document.createElement('header');
+    masthead.className = 'reader-masthead';
+
+    const kicker = document.createElement('div');
+    kicker.className = 'reader-kicker';
+    kicker.textContent = 'قراءة منسقة من الويب العربي';
+
+    const title = document.createElement('h1');
+    title.className = 'reader-post-title';
+    title.textContent = post.title || 'منشور بدون عنوان';
+
+    const row = document.createElement('div');
+    row.className = 'reader-source-row';
+    const sourceName = createLink('source-name', post.site_name || 'موقع مستقل', post.site_url);
+    row.append(sourceName);
+
+    if (post.site_domain) {
+      const domain = document.createElement('span');
+      domain.className = 'source-domain';
+      domain.textContent = post.site_domain;
+      row.append(domain);
+    }
+
+    const date = document.createElement('time');
+    date.className = 'source-date';
+    date.textContent = post.date_ar || '';
+    date.hidden = !post.date_ar;
+    row.append(date);
+
+    const actions = document.createElement('div');
+    actions.className = 'source-actions';
+    actions.setAttribute('aria-label', 'روابط المصدر');
+
+    const original = createLink('source-action source-action-primary', 'قراءة الأصل ↗', post.link);
+    const visit = createLink('source-action', 'زيارة المدونة', post.site_url);
+    actions.append(original, visit);
+
+    masthead.append(kicker, title, row, actions);
+    return masthead;
+  }
+
+  function createSourceFooter(post) {
+    const footer = document.createElement('footer');
+    footer.className = 'source-footer';
+
+    const label = document.createElement('span');
+    label.textContent = 'هذا العرض نسخة قراءة منسقة. النص الأصلي منشور في';
+    const source = createLink('', post.site_name || 'موقع مستقل', post.site_url);
+    const dot = document.createElement('span');
+    dot.textContent = '·';
+    const original = createLink('', 'افتح المقال الأصلي', post.link);
+
+    footer.append(label, source, dot, original);
+    return footer;
+  }
+
   function getLinkedPostIndex() {
     const hash = window.location.hash.replace(/^#/, '');
     const params = new URLSearchParams(hash);
@@ -150,8 +246,15 @@
     setHref(nodes.site, post.site_url);
     setHref(nodes.readMore, post.link);
 
+    const shell = document.createElement('div');
+    shell.className = 'reader-shell';
+    shell.append(createSourceCard(post));
+
     if (post.content) {
-      nodes.contentArea.innerHTML = '<div class="reader-view">' + post.content + '</div>';
+      const reader = document.createElement('div');
+      reader.className = 'reader-view';
+      reader.innerHTML = post.content;
+      shell.append(reader);
     } else {
       const summary = (post.summary || '').slice(0, 800).trim() + ((post.summary || '').length > 800 ? '…' : '');
       const fallback = document.createElement('div');
@@ -173,9 +276,11 @@
       setHref(original, post.link);
 
       fallback.append(label, summaryNode, original);
-      nodes.contentArea.replaceChildren(fallback);
+      shell.append(fallback);
     }
 
+    shell.append(createSourceFooter(post));
+    nodes.contentArea.replaceChildren(shell);
     nodes.contentArea.scrollTop = 0;
   }
 
