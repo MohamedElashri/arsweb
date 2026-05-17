@@ -80,7 +80,7 @@ jobs:
           "
 
       - name: Download previous feed cache
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v21
         with:
           name: feed-cache
           workflow: update.yml
