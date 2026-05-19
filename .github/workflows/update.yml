@@ -155,7 +155,7 @@ jobs:
           ls -la public/
 
       - name: Upload feed cache artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: feed-cache
           path: feed_cache.json
