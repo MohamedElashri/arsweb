@@ -18,7 +18,6 @@ https://ezzat.info/feed/
 https://nihad.me/blog/feed/
 https://wjoood.com/feed/
 https://sasini.me/feed/
-https://www.thamood.me/feed/
 https://sf7t.com/index.xml
 https://midoodj.me/index.xml
 https://www.blackcoffee.tech/feeds/posts/default
