@@ -75,7 +75,8 @@ jobs:
           lines = [
               "This automated PR removes RSS feeds that failed validation repeatedly.",
               "",
-              "Validation skips recency checks here. Feeds are only removed after 3 consecutive failed weekly checks.",
+              "Validation skips recency checks here. Feeds are only removed after 3 consecutive removal-eligible failed weekly checks.",
+              "HTTP 403 access-blocked feeds are reported but kept because the runner may be blocked by the host.",
               "",
               f"Failed feeds in latest run: {len(failed)}",
               f"Removal candidates: {len(candidates)}",
@@ -85,8 +86,8 @@ jobs:
               lines.append("")
               for item in candidates:
                   details = item["details"] or item["reason"]
-                  count = item.get("consecutive_failures", 0)
-                  lines.append(f"- `{item['url']}`: {details} ({count} consecutive failures)")
+                  count = item.get("consecutive_removable_failures", item.get("consecutive_failures", 0))
+                  lines.append(f"- `{item['url']}`: {details} ({count} removal-eligible consecutive failures)")
 
           Path("broken-feeds-pr.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY

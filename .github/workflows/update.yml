@@ -122,8 +122,9 @@ jobs:
           total = sum(len(s['entries']) for s in cache['sites'])
           has_content = sum(1 for s in cache['sites'] for e in s['entries'] if e.get('content'))
           failed = len(cache.get('failed_feeds', []))
+          stale = len(cache.get('stale_feeds', []))
           pct = (has_content / total * 100) if total else 0
-          print(f'📄 Posts: {total} | Content extracted: {has_content}/{total} ({pct:.0f}%) | Failed feeds skipped: {failed}')
+          print(f'📄 Posts: {total} | Content extracted: {has_content}/{total} ({pct:.0f}%) | Failed feeds skipped: {failed} | Cached blocked feeds: {stale}')
           "
 
       - name: Generate site

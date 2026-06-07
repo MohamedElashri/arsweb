@@ -16,6 +16,11 @@ import feedparser
 import requests
 import trafilatura
 
+try:
+    from feed_http import get_feed_response, was_retried_after_access_block
+except ImportError:
+    from scripts.feed_http import get_feed_response, was_retried_after_access_block
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -31,6 +36,7 @@ REQUEST_TIMEOUT = 12
 CONTENT_TIMEOUT = 15
 MAX_CONTENT_LENGTH = 40000  # characters
 CONTENT_WORKERS = 4
+FEED_USER_AGENT = "Mozilla/5.0 (compatible; ArabicSmallWeb/1.0)"
 
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
 ALLOWED_TAGS = {
@@ -65,6 +71,42 @@ def load_sources():
             seen.add(url)
             urls.append(url)
     return urls
+
+
+def load_previous_cache():
+    """Load the existing feed cache so blocked feeds can keep their last good copy."""
+    if not CACHE_FILE.exists():
+        return {}
+    try:
+        return json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.warning("Could not read previous cache: %s", e)
+        return {}
+
+
+def previous_sites_by_feed(cache):
+    """Index cached site entries by their feed URL."""
+    return {
+        site["feed"]: site
+        for site in cache.get("sites", [])
+        if site.get("feed")
+    }
+
+
+def feed_failure(feed_url, error, reason="fetch_error", status_code=None):
+    """Return a structured feed fetch failure."""
+    return {
+        "feed": feed_url,
+        "entries": [],
+        "error": str(error),
+        "reason": reason,
+        "status_code": status_code,
+    }
+
+
+def is_access_blocked(result):
+    """Return True when GitHub is blocked from reading an otherwise configured feed."""
+    return bool(result and result.get("status_code") == 403)
 
 
 def normalize_text(text):
@@ -285,24 +327,30 @@ def fetch_feed(feed_url):
     """Fetch a single RSS feed and return parsed entries."""
     logger.info("Fetching %s ...", feed_url)
     try:
-        resp = requests.get(
-            feed_url,
-            timeout=REQUEST_TIMEOUT,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; ArabicSmallWeb/1.0)",
-                "Accept": "application/rss+xml,application/atom+xml,application/xml,text/xml,*/*;q=0.8",
-                "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
-            },
-        )
+        resp = get_feed_response(feed_url, timeout=REQUEST_TIMEOUT, user_agent=FEED_USER_AGENT)
         resp.raise_for_status()
         feed = feedparser.parse(resp.content)
+    except requests.HTTPError as e:
+        status_code = e.response.status_code if e.response is not None else None
+        logger.error("Failed to fetch %s: %s", feed_url, e)
+        return feed_failure(feed_url, e, reason="http_error", status_code=status_code)
+    except requests.RequestException as e:
+        logger.error("Failed to fetch %s: %s", feed_url, e)
+        return feed_failure(feed_url, e, reason="http_error")
     except Exception as e:
         logger.error("Failed to fetch %s: %s", feed_url, e)
-        return None
+        return feed_failure(feed_url, e)
 
     if feed.bozo and not feed.entries:
         logger.warning("No entries from %s (bozo: %s)", feed_url, feed.bozo_exception)
-        return None
+        if was_retried_after_access_block(resp):
+            return feed_failure(
+                feed_url,
+                f"Unreadable feed response after 403 browser-header retry: {feed.bozo_exception}",
+                reason="access_blocked",
+                status_code=403,
+            )
+        return feed_failure(feed_url, feed.bozo_exception, reason="parse_error")
 
     site_name = feed.feed.get("title", "").strip() or feed_url
     site_url = feed.feed.get("link", "").strip() or feed_url
@@ -377,6 +425,8 @@ def extract_article_contents(entries):
 
 def main():
     sites = load_sources()
+    previous_cache = load_previous_cache()
+    cached_sites = previous_sites_by_feed(previous_cache)
     cache = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "sources_count": len(sites),
@@ -384,12 +434,31 @@ def main():
         "posts_count": 0,
         "sites": [],
         "failed_feeds": [],
+        "stale_feeds": [],
     }
 
     total_posts = 0
     for feed_url in sites:
         result = fetch_feed(feed_url)
-        if result is None:
+        if result is None or result.get("error"):
+            if is_access_blocked(result) and feed_url in cached_sites:
+                cached_site = dict(cached_sites[feed_url])
+                cached_site["stale"] = True
+                cached_site["stale_reason"] = "access_blocked"
+                cached_site["stale_cached_at"] = previous_cache.get("generated_at", "")
+                cache["sites"].append(cached_site)
+                post_count = len(cached_site.get("entries", []))
+                total_posts += post_count
+                cache["stale_feeds"].append(feed_url)
+                logger.warning(
+                    "Using cached copy for %s after 403 access block (%d entries)",
+                    feed_url,
+                    post_count,
+                )
+                if total_posts >= MAX_POSTS_TOTAL:
+                    break
+                continue
+
             logger.warning("Skipping %s due to errors", feed_url)
             cache["failed_feeds"].append(feed_url)
             continue

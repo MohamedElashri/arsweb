@@ -14,6 +14,10 @@ from pathlib import Path
 import feedparser
 import requests
 
+try:
+    from feed_http import get_feed_response, was_retried_after_access_block
+except ImportError:
+    from scripts.feed_http import get_feed_response, was_retried_after_access_block
 
 USER_AGENT = "Mozilla/5.0 (compatible; ASW-Validator/1.0)"
 
@@ -25,7 +29,9 @@ class FeedValidationResult:
     reason: str
     details: str = ""
     temporary: bool = False
+    removable: bool = True
     consecutive_failures: int = 0
+    consecutive_removable_failures: int = 0
     remove_candidate: bool = False
     status_code: int | None = None
     entries: int = 0
@@ -56,6 +62,19 @@ def is_temporary_http_failure(status_code):
     return status_code in {408, 425, 429} or 500 <= status_code <= 599
 
 
+def is_access_blocked(status_code):
+    """Classify HTTP statuses that mean the runner is blocked, not the feed is dead."""
+    return status_code == 403
+
+
+def mark_access_blocked(result, details):
+    """Mark a validation result as blocked by the host instead of removable."""
+    result.reason = "access_blocked"
+    result.details = details
+    result.removable = False
+    return result
+
+
 def print_result(result):
     """Print a human-readable validation result."""
     print(f"🔍 Validating: {result.url}")
@@ -76,7 +95,8 @@ def print_result(result):
         return
 
     temporary = "temporary " if result.temporary else ""
-    print(f"  ❌ {temporary}{result.reason}: {result.details}")
+    removal_note = " (not a removal candidate)" if not result.removable else ""
+    print(f"  ❌ {temporary}{result.reason}: {result.details}{removal_note}")
 
 
 def validate_feed_once(url, check_age=True, timeout=30):
@@ -84,19 +104,16 @@ def validate_feed_once(url, check_age=True, timeout=30):
     result = FeedValidationResult(url=url, ok=False, reason="unknown")
 
     try:
-        response = requests.get(
-            url,
-            timeout=timeout,
-            headers={
-                "User-Agent": USER_AGENT,
-                "Accept": "application/rss+xml,application/atom+xml,application/xml,text/xml,*/*;q=0.8",
-            },
-        )
+        response = get_feed_response(url, timeout=timeout, user_agent=USER_AGENT)
         response.raise_for_status()
         result.status_code = response.status_code
     except requests.HTTPError as e:
         result.status_code = e.response.status_code if e.response is not None else None
-        result.reason = "http_error"
+        if result.status_code and is_access_blocked(result.status_code):
+            result.reason = "access_blocked"
+            result.removable = False
+        else:
+            result.reason = "http_error"
         result.details = str(e)
         result.temporary = bool(result.status_code and is_temporary_http_failure(result.status_code))
         return result
@@ -117,11 +134,21 @@ def validate_feed_once(url, check_age=True, timeout=30):
     result.title = getattr(feed.feed, "title", "")
 
     if feed.bozo and not feed.entries:
+        if was_retried_after_access_block(response):
+            return mark_access_blocked(
+                result,
+                f"Unreadable feed response after 403 browser-header retry: {feed.bozo_exception}",
+            )
         result.reason = "parse_error"
         result.details = str(feed.bozo_exception)
         return result
 
     if not feed.entries:
+        if was_retried_after_access_block(response):
+            return mark_access_blocked(
+                result,
+                "No feed entries found after 403 browser-header retry",
+            )
         result.reason = "empty_feed"
         result.details = "No entries found in feed"
         return result
@@ -173,6 +200,18 @@ def load_failure_state(path):
         return {"feeds": {}}
 
 
+def previous_removable_failures(feed_state):
+    """Return the previous removal-eligible failure count, migrating older state."""
+    if "consecutive_removable_failures" in feed_state:
+        return int(feed_state.get("consecutive_removable_failures", 0))
+
+    details = str(feed_state.get("last_details", ""))
+    if feed_state.get("last_reason") == "access_blocked" or "403" in details or "Forbidden" in details:
+        return 0
+
+    return int(feed_state.get("consecutive_failures", 0))
+
+
 def update_failure_state(results, state, threshold):
     """Update consecutive failure counts and mark removal candidates."""
     feeds = state.setdefault("feeds", {})
@@ -187,23 +226,33 @@ def update_failure_state(results, state, threshold):
         feed_state = feeds.setdefault(result.url, {})
         if result.ok:
             feed_state["consecutive_failures"] = 0
+            feed_state["consecutive_removable_failures"] = 0
             feed_state["last_reason"] = "ok"
+            feed_state["removable"] = True
             result.consecutive_failures = 0
+            result.consecutive_removable_failures = 0
             result.remove_candidate = False
             continue
 
         consecutive_failures = int(feed_state.get("consecutive_failures", 0)) + 1
+        consecutive_removable_failures = (
+            previous_removable_failures(feed_state) + 1 if result.removable else 0
+        )
         feed_state.update(
             {
                 "consecutive_failures": consecutive_failures,
+                "consecutive_removable_failures": consecutive_removable_failures,
                 "last_reason": result.reason,
                 "last_details": result.details,
                 "temporary": result.temporary,
+                "removable": result.removable,
+                "status_code": result.status_code,
                 "last_failed_at": now,
             }
         )
         result.consecutive_failures = consecutive_failures
-        result.remove_candidate = consecutive_failures >= threshold
+        result.consecutive_removable_failures = consecutive_removable_failures
+        result.remove_candidate = result.removable and consecutive_removable_failures >= threshold
 
     state["updated_at"] = now
     return state
