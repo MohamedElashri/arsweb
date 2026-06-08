@@ -23,7 +23,6 @@ https://midoodj.me/index.xml
 https://www.blackcoffee.tech/feeds/posts/default
 https://iwatheq.com/feed.xml
 https://www.anwarbosbool.com/ar/feed/
-https://wosom.net/feed/
 https://www.helali.net/wp/feed
 https://beshrabdulhadi.com/feed/
 https://akhmees.info/ar/feed/
