@@ -33,7 +33,7 @@ jobs:
           uv pip install -r requirements.txt
 
       - name: Download previous failure state
-        uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # sanad: ref=v21
+        uses: dawidd6/action-download-artifact@57aa996fc1713cc1579039614f4645a7f4841fd4 # sanad: ref=v23
         with:
           name: broken-feeds-state
           workflow: remove-broken-feeds.yml
