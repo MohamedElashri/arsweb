@@ -37,7 +37,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # sanad: ref=v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # sanad: ref=v10.0.1
 
       - name: Cache Python dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # sanad: ref=v6.1.0
@@ -80,7 +80,7 @@ jobs:
           "
 
       - name: Download previous feed cache
-        uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # sanad: ref=v21
+        uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # sanad: ref=v24
         with:
           name: feed-cache
           workflow: update.yml
@@ -177,4 +177,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # sanad: ref=v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # sanad: ref=v5.0.1

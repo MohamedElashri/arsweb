@@ -24,7 +24,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # sanad: ref=v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # sanad: ref=v10.0.1
 
       - name: Install deps
         run: |
@@ -33,7 +33,7 @@ jobs:
           uv pip install -r requirements.txt
 
       - name: Download previous failure state
-        uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # sanad: ref=v21
+        uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # sanad: ref=v24
         with:
           name: broken-feeds-state
           workflow: remove-broken-feeds.yml
