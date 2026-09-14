@@ -44,7 +44,6 @@ https://tariqk.me/feed/
 https://fariszr.com/index.xml
 https://abotyim.github.io/ar/index.xml
 https://eltabarani.com/rss.xml
-https://ar.melashri.net/rss.xml
 https://najlaksows.com/feed/
 https://abdullah.kw/ar/rss/articles
 https://muhamedishaq.com/?feed=rss2
