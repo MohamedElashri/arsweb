@@ -54,3 +54,4 @@ https://riadh-felhi.tn/feed/
 https://www.shabayek.com/feed
 https://mutafakker.blog/feed/
 https://albadr.com/feed/
+https://motaz.cc/rss.xml
