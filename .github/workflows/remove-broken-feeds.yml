@@ -14,17 +14,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # sanad: ref=v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # sanad: ref=v7.0.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # sanad: ref=v10.0.1
+        uses: astral-sh/setup-uv@v10.3.2
 
       - name: Install deps
         run: |
@@ -33,7 +33,7 @@ jobs:
           uv pip install -r requirements.txt
 
       - name: Download previous failure state
-        uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # sanad: ref=v24
+        uses: dawidd6/action-download-artifact@v27
         with:
           name: broken-feeds-state
           workflow: remove-broken-feeds.yml
@@ -54,7 +54,7 @@ jobs:
 
       - name: Upload failure state
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # sanad: ref=v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: broken-feeds-state
           path: broken-feeds-state.json
